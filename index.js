@@ -2,9 +2,16 @@ const express = require('express');
 const app = express();
 const http = require('http').Server(app);
 const io = require('socket.io')(http);
+const fs = require('fs');
 
 app.use(express.json());
-let users = []; 
+
+// Persistent Database Logic
+let users = [];
+const dbPath = './users.json';
+if (fs.existsSync(dbPath)) {
+    users = JSON.parse(fs.readFileSync(dbPath));
+}
 
 const UI = `
 <!DOCTYPE html>
@@ -12,10 +19,7 @@ const UI = `
 <head>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    @keyframes rainbow {
-      0% { filter: hue-rotate(0deg); }
-      100% { filter: hue-rotate(360deg); }
-    }
+    @keyframes rainbow { 0% { filter: hue-rotate(0deg); } 100% { filter: hue-rotate(360deg); } }
     body { 
       margin:0; background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab); 
       background-size: 400% 400%; animation: river 15s ease infinite, rainbow 20s linear infinite; 
@@ -27,37 +31,46 @@ const UI = `
   </style>
 </head>
 <body>
-  <div id="auth-screen" class="glass p-12 rounded-[3rem] w-full max-w-md text-center">
-    <h1 class="text-5xl font-black mb-8">Glass Pro</h1>
+  <div id="auth-screen" class="glass p-12 rounded-[3.5rem] w-full max-w-md text-center shadow-2xl">
+    <h1 class="text-5xl font-black italic mb-10">Glass Pro</h1>
+    
     <div id="login-box" class="space-y-4">
-      <input id="l-user" placeholder="Username" class="w-full p-4 rounded-2xl bg-white/10 outline-none">
-      <input id="l-pass" type="password" placeholder="Password" class="w-full p-4 rounded-2xl bg-white/10 outline-none">
-      <button onclick="login()" class="w-full py-4 bg-white text-black rounded-2xl font-bold">ENTER</button>
+      <input id="l-user" placeholder="Username" class="w-full p-5 rounded-2xl bg-white/10 outline-none border border-white/10 text-white">
+      <input id="l-pass" type="password" placeholder="Password" class="w-full p-5 rounded-2xl bg-white/10 outline-none border border-white/10 text-white">
+      <button onclick="login()" class="w-full py-5 bg-white text-black rounded-3xl font-black text-xl hover:scale-105 transition">LOGIN</button>
+      <button onclick="showSignup()" class="w-full py-3 bg-white/5 rounded-2xl text-xs font-bold border border-white/10 mt-4">CREATE NEW ACCOUNT</button>
+    </div>
+
+    <div id="signup-box" class="hidden space-y-4">
+      <input id="s-user" placeholder="New Username" class="w-full p-5 rounded-2xl bg-white/10 outline-none border border-white/10 text-white">
+      <input id="s-pass" type="password" placeholder="New Password" class="w-full p-5 rounded-2xl bg-white/10 outline-none border border-white/10 text-white">
+      <input id="s-vid" placeholder="Virtual ID (888)" class="w-full p-5 rounded-2xl bg-white/10 outline-none border border-white/10 text-white">
+      <button onclick="signup()" class="w-full py-5 bg-blue-600 text-white rounded-3xl font-black text-xl">SIGN UP</button>
+      <button onclick="showLogin()" class="w-full py-3 opacity-50 text-xs font-bold mt-4">BACK TO LOGIN</button>
     </div>
   </div>
 
-  <div id="chat-screen" class="hidden glass w-full max-w-6xl h-[90vh] rounded-[3rem] flex overflow-hidden">
-    <div class="w-64 border-r border-white/10 p-6 flex flex-col bg-black/20">
-      <div id="user-info" class="mb-8">
-        <p id="display-name" class="font-bold text-xl"></p>
-        <p id="display-id" class="text-xs opacity-50"></p>
+  <div id="chat-screen" class="hidden glass w-full max-w-6xl h-[90vh] rounded-[4rem] flex overflow-hidden">
+    <div class="w-72 border-r border-white/10 p-8 flex flex-col bg-black/20">
+      <div class="mb-10">
+        <h2 id="display-name" class="text-2xl font-black italic"></h2>
+        <p id="display-id" class="text-[10px] tracking-widest opacity-40 uppercase font-bold"></p>
       </div>
-      <button onclick="startCall()" class="mb-2 p-3 bg-green-500/20 rounded-xl text-xs font-bold">📞 VOICE CALL</button>
+      <button onclick="startCall()" class="w-full p-4 bg-green-500/20 rounded-2xl text-[10px] font-black tracking-widest mb-4">📞 VOICE CALL</button>
       <div class="flex-1"></div>
-      <button onclick="location.reload()" class="opacity-30 text-xs">LOGOUT</button>
+      <button onclick="location.reload()" class="text-[10px] font-bold opacity-30 hover:opacity-100 uppercase tracking-widest">Logout</button>
     </div>
-
-    <div class="flex-1 flex flex-col p-6">
-      <div id="messages" class="flex-1 overflow-y-auto space-y-4 p-4"></div>
-      
-      <div class="mt-4 flex flex-col gap-2">
-        <div id="preview" class="hidden h-20 w-20 rounded-lg bg-cover bg-center border border-white/20"></div>
-        <div class="flex gap-2 bg-white/5 p-2 rounded-2xl border border-white/10">
-          <label class="p-4 cursor-pointer hover:bg-white/10 rounded-xl">
+    
+    <div class="flex-1 flex flex-col p-8">
+      <div id="messages" class="flex-1 overflow-y-auto space-y-4 pr-4"></div>
+      <div class="mt-6 flex flex-col gap-3">
+        <div id="preview" class="hidden h-24 w-24 rounded-2xl border-2 border-white/20 bg-center bg-cover"></div>
+        <div class="flex gap-4 bg-white/5 p-3 rounded-[2.5rem] border border-white/10 shadow-inner">
+          <label class="p-4 cursor-pointer hover:bg-white/10 rounded-full transition">
             📎 <input type="file" id="file-input" class="hidden" onchange="handleFile(this)">
           </label>
-          <input id="msg-input" placeholder="Message..." class="flex-1 bg-transparent outline-none">
-          <button onclick="sendMsg()" class="bg-white text-black px-8 rounded-xl font-bold">SEND</button>
+          <input id="msg-input" placeholder="Message..." class="flex-1 bg-transparent p-4 outline-none text-white font-medium">
+          <button onclick="sendMsg()" class="bg-white text-black px-12 rounded-[2rem] font-black hover:scale-105 transition">SEND</button>
         </div>
       </div>
     </div>
@@ -69,23 +82,43 @@ const UI = `
     let currentUser = "";
     let mediaData = null;
 
-    // Ask for notification permission
-    Notification.requestPermission();
+    function showSignup() {
+      document.getElementById('login-box').classList.add('hidden');
+      document.getElementById('signup-box').classList.remove('hidden');
+    }
+    function showLogin() {
+      document.getElementById('signup-box').classList.add('hidden');
+      document.getElementById('login-box').classList.remove('hidden');
+    }
 
-    function login() {
+    async function signup() {
+      const user = document.getElementById('s-user').value;
+      const pass = document.getElementById('s-pass').value;
+      const vid = document.getElementById('s-vid').value;
+      const res = await fetch('/signup', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({user, pass, vid})
+      });
+      if(res.ok) { alert("Account Created!"); showLogin(); }
+    }
+
+    async function login() {
       const user = document.getElementById('l-user').value;
       const pass = document.getElementById('l-pass').value;
-      fetch('/login', {
+      const res = await fetch('/login', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({user, pass})
-      }).then(res => res.json()).then(data => {
+      });
+      if(res.ok) {
+        const data = await res.json();
         currentUser = data.user;
         document.getElementById('auth-screen').classList.add('hidden');
         document.getElementById('chat-screen').classList.remove('hidden');
         document.getElementById('display-name').innerText = data.user;
         document.getElementById('display-id').innerText = "ID: " + data.vid;
-      });
+      } else { alert("Login failed! Check credentials."); }
     }
 
     function handleFile(input) {
@@ -93,8 +126,9 @@ const UI = `
       const reader = new FileReader();
       reader.onload = (e) => {
         mediaData = { type: file.type.split('/')[0], data: e.target.result };
-        document.getElementById('preview').style.backgroundImage = \`url(\${e.target.result})\`;
-        document.getElementById('preview').classList.remove('hidden');
+        const prev = document.getElementById('preview');
+        prev.style.backgroundImage = \`url(\${e.target.result})\`;
+        prev.classList.remove('hidden');
       };
       reader.readAsDataURL(file);
     }
@@ -111,34 +145,31 @@ const UI = `
 
     socket.on('msg', (msg) => {
       const div = document.createElement('div');
-      div.className = "p-4 rounded-2xl max-w-[80%] " + (msg.user === currentUser ? "ml-auto bg-white text-black shadow-lg" : "bg-white/10");
-      
-      let content = \`<b>\${msg.user}</b><br>\${msg.text}\`;
+      div.className = "p-5 rounded-[2rem] max-w-[75%] " + (msg.user === currentUser ? "ml-auto bg-white text-black shadow-xl" : "bg-white/10");
+      let content = \`<b>\${msg.user}:</b><br>\${msg.text}\`;
       if(msg.media) {
-        if(msg.media.type === 'image') content += \`<img src="\${msg.media.data}" class="mt-2 rounded-lg max-h-60">\`;
-        if(msg.media.type === 'video') content += \`<video src="\${msg.media.data}" controls class="mt-2 rounded-lg max-h-60"></video>\`;
+        if(msg.media.type === 'image') content += \`<img src="\${msg.media.data}" class="mt-3 rounded-xl max-h-64 shadow-lg">\`;
+        if(msg.media.type === 'video') content += \`<video src="\${msg.media.data}" controls class="mt-3 rounded-xl max-h-64 shadow-lg"></video>\`;
       }
-      
       div.innerHTML = content;
       document.getElementById('messages').appendChild(div);
       document.getElementById('messages').scrollTop = 99999;
-
-      if(msg.user !== currentUser && document.hidden) {
-        new Notification("New Message from " + msg.user, { body: msg.text });
-      }
     });
 
-    async function startCall() {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      alert("Microphone active! (WebRTC connection logic triggered)");
-    }
+    function startCall() { alert("Voice call initiated..."); }
   </script>
 </body>
 </html>
 `;
 
 app.get('/', (req, res) => res.send(UI));
-app.post('/signup', (req, res) => { users.push(req.body); res.sendStatus(200); });
+
+app.post('/signup', (req, res) => {
+  users.push(req.body);
+  fs.writeFileSync(dbPath, JSON.stringify(users));
+  res.sendStatus(200);
+});
+
 app.post('/login', (req, res) => {
   const match = users.find(u => u.user === req.body.user && u.pass === req.body.pass);
   if(match) res.json(match); else res.sendStatus(401);
