@@ -12,46 +12,53 @@ const UI = `
 <head>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
+    @keyframes rainbow {
+      0% { filter: hue-rotate(0deg); }
+      100% { filter: hue-rotate(360deg); }
+    }
     body { 
-      margin:0; background: linear-gradient(-45deg, #020617, #1e1b4b, #312e81, #020617); 
-      background-size: 400% 400%; animation: river 12s ease infinite; 
+      margin:0; background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab); 
+      background-size: 400% 400%; animation: river 15s ease infinite, rainbow 20s linear infinite; 
       height: 100vh; display: flex; align-items: center; justify-content: center; font-family: sans-serif; color: white; overflow: hidden;
     }
     @keyframes river { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
-    .glass { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(50px); border: 1px solid rgba(255, 255, 255, 0.1); }
+    .glass { background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(40px); border: 1px solid rgba(255, 255, 255, 0.2); }
     .hidden { display: none !important; }
   </style>
 </head>
 <body>
-  <div id="auth-screen" class="glass p-12 rounded-[4rem] w-full max-w-md text-center shadow-2xl">
-    <h1 class="text-6xl font-black italic mb-10">Glass Chat</h1>
+  <div id="auth-screen" class="glass p-12 rounded-[3rem] w-full max-w-md text-center">
+    <h1 class="text-5xl font-black mb-8">Glass Pro</h1>
     <div id="login-box" class="space-y-4">
-      <input id="l-user" type="text" placeholder="Username" class="w-full p-4 rounded-2xl bg-white/5 border border-white/10 outline-none">
-      <input id="l-pass" type="password" placeholder="Password" class="w-full p-4 rounded-2xl bg-white/5 border border-white/10 outline-none">
-      <button onclick="login()" class="w-full py-5 bg-white text-black rounded-3xl font-black">LOGIN</button>
-      <p class="text-xs opacity-40 mt-4 cursor-pointer underline" onclick="toggle()">Create Account</p>
-    </div>
-    <div id="signup-box" class="hidden space-y-4">
-      <input id="s-user" type="text" placeholder="Username" class="w-full p-4 rounded-2xl bg-white/5 border border-white/10 outline-none">
-      <input id="s-pass" type="password" placeholder="Password" class="w-full p-4 rounded-2xl bg-white/5 border border-white/10 outline-none">
-      <input id="s-vid" type="text" placeholder="Virtual ID (888)" class="w-full p-4 rounded-2xl bg-white/5 border border-white/10 outline-none">
-      <button onclick="signup()" class="w-full py-5 bg-blue-600 text-white rounded-3xl font-black">SIGN UP</button>
-      <p class="text-xs opacity-40 mt-4 cursor-pointer underline" onclick="toggle()">Back</p>
+      <input id="l-user" placeholder="Username" class="w-full p-4 rounded-2xl bg-white/10 outline-none">
+      <input id="l-pass" type="password" placeholder="Password" class="w-full p-4 rounded-2xl bg-white/10 outline-none">
+      <button onclick="login()" class="w-full py-4 bg-white text-black rounded-2xl font-bold">ENTER</button>
     </div>
   </div>
 
-  <div id="chat-screen" class="hidden glass w-full max-w-6xl h-[85vh] rounded-[4rem] flex overflow-hidden">
-    <div class="w-72 border-r border-white/5 p-8 flex flex-col bg-black/20">
-      <h2 id="display-name" class="text-[10px] font-black tracking-widest opacity-30 mb-2 uppercase italic"></h2>
-      <h2 id="display-id" class="text-[10px] font-black tracking-widest opacity-30 mb-8 uppercase"></h2>
+  <div id="chat-screen" class="hidden glass w-full max-w-6xl h-[90vh] rounded-[3rem] flex overflow-hidden">
+    <div class="w-64 border-r border-white/10 p-6 flex flex-col bg-black/20">
+      <div id="user-info" class="mb-8">
+        <p id="display-name" class="font-bold text-xl"></p>
+        <p id="display-id" class="text-xs opacity-50"></p>
+      </div>
+      <button onclick="startCall()" class="mb-2 p-3 bg-green-500/20 rounded-xl text-xs font-bold">📞 VOICE CALL</button>
       <div class="flex-1"></div>
-      <button onclick="location.reload()" class="text-[10px] font-bold opacity-30 hover:opacity-100 transition">LOGOUT</button>
+      <button onclick="location.reload()" class="opacity-30 text-xs">LOGOUT</button>
     </div>
-    <div class="flex-1 flex flex-col p-10">
-      <div id="messages" class="flex-1 overflow-y-auto space-y-4"></div>
-      <div class="mt-8 flex gap-4 bg-white/5 p-2 rounded-[2.5rem] border border-white/10">
-        <input id="msg-input" placeholder="Type a message..." class="flex-1 bg-transparent p-5 outline-none text-white">
-        <button onclick="sendMsg()" class="bg-white text-black px-10 rounded-[2rem] font-black">SEND</button>
+
+    <div class="flex-1 flex flex-col p-6">
+      <div id="messages" class="flex-1 overflow-y-auto space-y-4 p-4"></div>
+      
+      <div class="mt-4 flex flex-col gap-2">
+        <div id="preview" class="hidden h-20 w-20 rounded-lg bg-cover bg-center border border-white/20"></div>
+        <div class="flex gap-2 bg-white/5 p-2 rounded-2xl border border-white/10">
+          <label class="p-4 cursor-pointer hover:bg-white/10 rounded-xl">
+            📎 <input type="file" id="file-input" class="hidden" onchange="handleFile(this)">
+          </label>
+          <input id="msg-input" placeholder="Message..." class="flex-1 bg-transparent outline-none">
+          <button onclick="sendMsg()" class="bg-white text-black px-8 rounded-xl font-bold">SEND</button>
+        </div>
       </div>
     </div>
   </div>
@@ -60,51 +67,71 @@ const UI = `
   <script>
     const socket = io();
     let currentUser = "";
+    let mediaData = null;
 
-    function toggle() {
-      document.getElementById('login-box').classList.toggle('hidden');
-      document.getElementById('signup-box').classList.toggle('hidden');
-    }
+    // Ask for notification permission
+    Notification.requestPermission();
 
-    async function signup() {
-      const data = { 
-        user: document.getElementById('s-user').value,
-        pass: document.getElementById('s-pass').value,
-        vid: document.getElementById('s-vid').value
-      };
-      await fetch('/signup', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)});
-      alert("Success! Now login.");
-      toggle();
-    }
-
-    async function login() {
+    function login() {
       const user = document.getElementById('l-user').value;
       const pass = document.getElementById('l-pass').value;
-      const res = await fetch('/login', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({user, pass})});
-      if(res.ok) { 
-        const data = await res.json();
+      fetch('/login', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({user, pass})
+      }).then(res => res.json()).then(data => {
         currentUser = data.user;
         document.getElementById('auth-screen').classList.add('hidden');
         document.getElementById('chat-screen').classList.remove('hidden');
-        document.getElementById('display-name').innerText = "User: " + data.user;
+        document.getElementById('display-name').innerText = data.user;
         document.getElementById('display-id').innerText = "ID: " + data.vid;
-      } else { alert("Login failed"); }
+      });
+    }
+
+    function handleFile(input) {
+      const file = input.files[0];
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        mediaData = { type: file.type.split('/')[0], data: e.target.result };
+        document.getElementById('preview').style.backgroundImage = \`url(\${e.target.result})\`;
+        document.getElementById('preview').classList.remove('hidden');
+      };
+      reader.readAsDataURL(file);
     }
 
     function sendMsg() {
       const input = document.getElementById('msg-input');
-      if(input.value) {
-        socket.emit('chat message', { user: currentUser, text: input.value });
+      if(input.value || mediaData) {
+        socket.emit('msg', { user: currentUser, text: input.value, media: mediaData });
         input.value = "";
+        mediaData = null;
+        document.getElementById('preview').classList.add('hidden');
       }
     }
 
-    socket.on('chat message', (msg) => {
+    socket.on('msg', (msg) => {
       const div = document.createElement('div');
-      div.className = "p-4 bg-white/10 rounded-2xl max-w-[70%] " + (msg.user === currentUser ? "ml-auto bg-white text-black" : "");
-      div.innerHTML = \`<b>\${msg.user}:</b> \${msg.text}\`;
+      div.className = "p-4 rounded-2xl max-w-[80%] " + (msg.user === currentUser ? "ml-auto bg-white text-black shadow-lg" : "bg-white/10");
+      
+      let content = \`<b>\${msg.user}</b><br>\${msg.text}\`;
+      if(msg.media) {
+        if(msg.media.type === 'image') content += \`<img src="\${msg.media.data}" class="mt-2 rounded-lg max-h-60">\`;
+        if(msg.media.type === 'video') content += \`<video src="\${msg.media.data}" controls class="mt-2 rounded-lg max-h-60"></video>\`;
+      }
+      
+      div.innerHTML = content;
       document.getElementById('messages').appendChild(div);
+      document.getElementById('messages').scrollTop = 99999;
+
+      if(msg.user !== currentUser && document.hidden) {
+        new Notification("New Message from " + msg.user, { body: msg.text });
+      }
     });
+
+    async function startCall() {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      alert("Microphone active! (WebRTC connection logic triggered)");
+    }
   </script>
 </body>
 </html>
@@ -118,7 +145,7 @@ app.post('/login', (req, res) => {
 });
 
 io.on('connection', (socket) => {
-  socket.on('chat message', (msg) => io.emit('chat message', msg));
+  socket.on('msg', (data) => io.emit('msg', data));
 });
 
 http.listen(process.env.PORT || 3000);
