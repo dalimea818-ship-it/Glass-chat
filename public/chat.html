@@ -5,36 +5,74 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="/socket.io/socket.io.js"></script>
     <style>
-        body { background: #000; color: white; height: 100vh; overflow: hidden; }
-        .glass { background: rgba(255,255,255,0.03); backdrop-filter: blur(20px); }
+        :root { --msg-color: #ffffff; }
+        body { color: white; height: 100vh; overflow: hidden; transition: background 0.5s ease; background: #000; }
+        .glass { background: rgba(255,255,255,0.03); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); }
         .hidden { display: none !important; }
+
+        /* ANIMATED BACKGROUNDS */
+        @keyframes gradientMove { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+        body.river { background: linear-gradient(-45deg, #001f3f, #0074D9, #001f3f); background-size: 300% 300%; animation: gradientMove 10s ease infinite; }
+        body.aurora { background: linear-gradient(-45deg, #0f2027, #2c5364, #203a43); background-size: 300% 300%; animation: gradientMove 8s ease infinite; }
+        body.sunset { background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5); background-size: 300% 300%; animation: gradientMove 12s ease infinite; }
+        body.custom-bg { background-size: cover !important; background-position: center !important; }
     </style>
 </head>
 <body class="flex items-center justify-center md:p-6">
-    <div id="tuto" class="hidden fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-8 text-center">
-        <div><h2 class="text-2xl font-bold mb-4">Welcome to Glass</h2><p class="opacity-50 mb-8">Search for a phone number to add contacts.</p><button onclick="done()" class="bg-white text-black px-12 py-4 rounded-2xl font-bold">START</button></div>
+
+    <div id="tuto-box" class="hidden fixed inset-0 z-[500] bg-black/80 flex items-center justify-center p-6 text-center">
+        <div class="glass p-10 rounded-[3rem] max-w-sm">
+            <div id="tuto-icon" class="text-5xl mb-4">🔍</div>
+            <h2 id="tuto-title" class="text-2xl font-black mb-2">Search</h2>
+            <p id="tuto-text" class="opacity-50 mb-8 text-sm">Enter a phone number to find friends.</p>
+            <button onclick="nextTuto()" class="w-full py-4 bg-white text-black rounded-2xl font-bold">NEXT</button>
+        </div>
     </div>
 
-    <div class="glass w-full max-w-6xl h-full md:h-[90vh] md:rounded-[2.5rem] flex overflow-hidden border border-white/10 relative">
+    <div class="glass w-full max-w-6xl h-full md:h-[90vh] md:rounded-[3rem] flex overflow-hidden relative shadow-2xl">
+        
         <div id="sidebar" class="w-full md:w-80 flex flex-col border-r border-white/5">
             <div class="p-6 flex justify-between items-center">
-                <h1 class="font-black italic">Glass</h1>
-                <div class="flex gap-2"><input id="sch" placeholder="Phone#" class="bg-white/5 p-2 rounded text-[10px] w-20 outline-none"><button onclick="add()" class="text-xs text-blue-400">ADD</button></div>
+                <h1 class="font-black italic text-xl">Glass</h1>
+                <button onclick="toggleSettings()" class="opacity-40 hover:opacity-100">⚙️</button>
             </div>
-            <div id="clist" class="flex-1 overflow-y-auto p-2 space-y-2"></div>
+            
+            <div class="px-4 pb-4">
+                <div class="bg-white/5 rounded-2xl flex items-center px-4">
+                    <input id="sch" placeholder="Search phone..." class="w-full py-3 bg-transparent text-xs outline-none">
+                    <button onclick="add()" class="text-blue-400 font-bold text-[10px]">ADD</button>
+                </div>
+            </div>
+
+            <div id="clist" class="flex-1 overflow-y-auto px-2 space-y-1"></div>
         </div>
 
         <div id="chat" class="hidden md:flex flex-1 flex-col bg-white/[0.01]">
             <div class="p-4 border-b border-white/5 flex items-center gap-4">
                 <button onclick="back()" class="md:hidden">←</button>
-                <img id="apfp" class="w-8 h-8 rounded-full hidden">
-                <h2 id="aname" class="font-bold text-sm">Select Contact</h2>
+                <img id="apfp" class="w-10 h-10 rounded-full border border-white/10 hidden">
+                <div class="flex-1"><h2 id="aname" class="font-bold text-sm">Welcome</h2></div>
             </div>
             <div id="msgs" class="flex-1 overflow-y-auto p-6 space-y-4"></div>
             <div class="p-4 flex gap-2">
-                <input id="in" placeholder="Message..." class="flex-1 bg-white/5 p-4 rounded-2xl outline-none">
-                <button onclick="send()" class="bg-white text-black px-6 rounded-2xl font-bold">➜</button>
+                <input id="in" placeholder="Message..." class="flex-1 bg-white/5 p-4 rounded-3xl outline-none" onkeypress="if(event.key==='Enter')send()">
+                <button onclick="send()" class="bg-white text-black w-14 h-14 flex items-center justify-center rounded-full font-bold">➜</button>
             </div>
+        </div>
+
+        <div id="settings" class="hidden absolute inset-0 z-[400] glass flex flex-col p-10 overflow-y-auto">
+            <div class="flex justify-between items-center mb-10"><h2 class="text-4xl font-black italic">Settings</h2><button onclick="toggleSettings()" class="text-2xl">✕</button></div>
+            
+            <p class="text-[10px] uppercase tracking-widest opacity-40 mb-4">Live Backgrounds</p>
+            <div class="grid grid-cols-2 gap-4 mb-10">
+                <div onclick="setTheme('river')" class="h-20 rounded-2xl bg-blue-900 border border-white/10 cursor-pointer"></div>
+                <div onclick="setTheme('aurora')" class="h-20 rounded-2xl bg-emerald-900 border border-white/10 cursor-pointer"></div>
+                <div onclick="setTheme('sunset')" class="h-20 rounded-2xl bg-orange-900 border border-white/10 cursor-pointer"></div>
+                <div onclick="document.getElementById('bgu').click()" class="h-20 rounded-2xl border-2 border-dashed border-white/20 flex items-center justify-center cursor-pointer">+ Photo</div>
+            </div>
+            <input type="file" id="bgu" class="hidden" accept="image/*" onchange="uploadBG(this)">
+            
+            <button onclick="logout()" class="w-full py-4 bg-red-500/10 text-red-500 rounded-2xl font-bold border border-red-500/20">LOGOUT</button>
         </div>
     </div>
 
@@ -42,22 +80,52 @@
         const socket = io();
         const me = JSON.parse(localStorage.getItem('user'));
         let active = null;
+        let tutoStep = 0;
+
         if(!me) window.location.href = "/";
-        if(!localStorage.getItem('ok')) document.getElementById('tuto').classList.remove('hidden');
-        function done() { localStorage.setItem('ok', '1'); document.getElementById('tuto').classList.add('hidden'); }
         socket.emit('login', me);
 
-        function add() { socket.emit('request-contact', { targetPhone: document.getElementById('sch').value, fromUser: me.user }); alert("Sent"); }
-        socket.on('contact-invite', (d) => { if(confirm(d.from + " wants to add you?")) socket.emit('accept-contact', { to: d.from, from: me.user }); });
-        socket.on('load-my-contacts', (c) => { render(c); });
-        socket.on('contact-added', (u) => { location.reload(); });
+        // --- TUTORIAL LOGIC ---
+        const steps = [
+            { icon: "🔍", title: "Search", text: "Find anyone by their phone number." },
+            { icon: "🌐", title: "Global Online", text: "We've added everyone online to your list so you can start now!" },
+            { icon: "⚙️", title: "Style", text: "Customize your background in settings." }
+        ];
 
-        function render(c) {
-            document.getElementById('clist').innerHTML = c.map(u => `
-                <div onclick='openC(${JSON.stringify(u)})' class="p-4 bg-white/5 rounded-2xl flex items-center gap-3">
-                    <img src="${u.pfp}" class="w-8 h-8 rounded-full border border-white/10">
-                    <p class="font-bold text-xs">${u.user}</p>
+        window.onload = () => {
+            if(!localStorage.getItem('tuto_done')) document.getElementById('tuto-box').classList.remove('hidden');
+            loadTheme();
+        };
+
+        function nextTuto() {
+            tutoStep++;
+            if(tutoStep < steps.length) {
+                document.getElementById('tuto-icon').innerText = steps[tutoStep].icon;
+                document.getElementById('tuto-title').innerText = steps[tutoStep].title;
+                document.getElementById('tuto-text').innerText = steps[tutoStep].text;
+            } else {
+                document.getElementById('tuto-box').classList.add('hidden');
+                localStorage.setItem('tuto_done', '1');
+                socket.emit('get-online-users'); // Populate global list
+            }
+        }
+
+        // --- CORE FUNCTIONS ---
+        function add() { socket.emit('request-contact', { targetPhone: document.getElementById('sch').value, fromUser: me.user }); }
+        socket.on('contact-invite', (d) => { if(confirm(d.from+" wants to add you?")) socket.emit('accept-contact', { to: d.from, from: me.user }); });
+        socket.on('contact-added', () => location.reload());
+        
+        socket.on('load-my-contacts', (c) => render(c, 'MY FRIENDS'));
+        socket.on('online-list', (c) => render(c, 'GLOBAL ONLINE'));
+
+        function render(c, label) {
+            const list = document.getElementById('clist');
+            const html = c.map(u => `
+                <div onclick='openC(${JSON.stringify(u)})' class="p-4 bg-white/5 rounded-2xl flex items-center gap-3 mb-2 cursor-pointer">
+                    <img src="${u.pfp}" class="w-10 h-10 rounded-full border border-white/10 object-cover">
+                    <p class="font-bold text-sm">${u.user}</p>
                 </div>`).join('');
+            list.innerHTML += `<p class="text-[9px] opacity-30 mt-4 mb-2 ml-2">${label}</p>` + html;
         }
 
         function openC(u) {
@@ -69,21 +137,54 @@
             socket.emit('load-history', { from: me.user, to: u.user });
             if(window.innerWidth < 768) { document.getElementById('sidebar').classList.add('hidden'); document.getElementById('chat').classList.remove('hidden'); document.getElementById('chat').classList.add('flex'); }
         }
+
         function back() { document.getElementById('sidebar').classList.remove('hidden'); document.getElementById('chat').classList.add('hidden'); }
         function send() { 
             const val = document.getElementById('in').value;
-            if(val && active) { socket.emit('send-private-msg', { to: active.user, from: me.user, text: val }); document.getElementById('in').value = ""; }
+            if(val && active) { 
+                socket.emit('send-private-msg', { to: active.user, from: me.user, text: val }); 
+                document.getElementById('in').value = ""; 
+            }
         }
+
         socket.on('chat-history', (h) => h.forEach(m => disp(m.sender, m.text)));
         socket.on('receive-msg', (d) => { if(active && (d.from === active.user || d.from === me.user)) disp(d.from, d.text); });
+
         function disp(f, t) {
             const isMe = f === me.user;
             const div = document.createElement('div');
             div.className = `flex ${isMe ? 'justify-end' : 'justify-start'}`;
-            div.innerHTML = `<div class="p-3 rounded-2xl text-xs ${isMe ? 'bg-white text-black' : 'bg-white/10'}">${t}</div>`;
+            div.innerHTML = `<div class="p-3 px-5 rounded-[1.5rem] text-sm ${isMe ? 'bg-white text-black' : 'bg-white/10'}">${t}</div>`;
             document.getElementById('msgs').appendChild(div);
             document.getElementById('msgs').scrollTop = 9999;
         }
+
+        // --- THEME ENGINE ---
+        function toggleSettings() { document.getElementById('settings').classList.toggle('hidden'); }
+        function setTheme(t) {
+            document.body.className = t;
+            localStorage.setItem('theme', t);
+        }
+        function uploadBG(input) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                document.body.className = 'custom-bg';
+                document.body.style.backgroundImage = `url(${e.target.result})`;
+                localStorage.setItem('theme', 'custom-bg');
+                localStorage.setItem('custom-img', e.target.result);
+            };
+            reader.readAsDataURL(input.files[0]);
+        }
+        function loadTheme() {
+            const t = localStorage.getItem('theme');
+            if(t === 'custom-bg') {
+                document.body.className = t;
+                document.body.style.backgroundImage = `url(${localStorage.getItem('custom-img')})`;
+            } else if(t) {
+                document.body.className = t;
+            }
+        }
+        function logout() { localStorage.clear(); window.location.href = "/"; }
     </script>
 </body>
 </html>
