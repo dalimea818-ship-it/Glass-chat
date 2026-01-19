@@ -5,11 +5,11 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="/socket.io/socket.io.js"></script>
     <style>
-        body { color: white; height: 100vh; overflow: hidden; background: #000; }
+        body { color: white; height: 100vh; overflow: hidden; background: #000; font-family: sans-serif; }
         .glass { background: rgba(255,255,255,0.03); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); }
         .hidden { display: none !important; }
-        body.river { background: linear-gradient(-45deg, #001f3f, #0074D9, #001f3f); background-size: 300% 300%; animation: gradient 10s infinite; }
-        @keyframes gradient { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+        .mode-btn { transition: all 0.3s ease; }
+        .mode-btn:active { transform: scale(0.9); }
     </style>
 </head>
 <body class="flex items-center justify-center md:p-6">
@@ -22,22 +22,14 @@
         </div>
     </div>
 
-    <div id="call-screen" class="hidden fixed inset-0 z-[600] bg-black/95 backdrop-blur-2xl flex flex-col items-center justify-center text-center">
-        <img id="call-pfp" class="w-32 h-32 rounded-full mb-6 object-cover border-4 border-white/20">
-        <h3 id="call-user" class="text-2xl font-bold mb-10">User</h3>
-        <div class="flex gap-10">
-            <button onclick="rejectCall()" class="w-20 h-20 bg-red-500 rounded-full text-2xl">✕</button>
-            <button id="accept-btn" onclick="acceptCall()" class="hidden w-20 h-20 bg-green-500 rounded-full text-2xl">📞</button>
-        </div>
-    </div>
-    <audio id="ring" src="https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3" loop></audio>
-    <audio id="dial" src="https://assets.mixkit.co/active_storage/sfx/1358/1358-preview.mp3" loop></audio>
-
-    <div class="glass w-full max-w-6xl h-full md:h-[90vh] md:rounded-[3rem] flex overflow-hidden relative">
+    <div class="glass w-full max-w-6xl h-full md:h-[90vh] md:rounded-[3rem] flex overflow-hidden relative shadow-2xl">
         <div id="sidebar" class="w-full md:w-80 flex flex-col border-r border-white/5">
             <div class="p-6 flex justify-between items-center">
-                <h1 id="mode-label" class="font-black italic">Glass</h1>
-                <button onclick="location.reload()" class="text-[10px] opacity-30">SWITCH</button>
+                <div>
+                    <h1 id="mode-label" class="font-black italic text-xl">Glass</h1>
+                    <p id="sub-label" class="text-[8px] opacity-30 tracking-widest uppercase">Contacts</p>
+                </div>
+                <button onclick="switchMode()" class="mode-btn w-10 h-10 bg-white/5 rounded-full flex items-center justify-center border border-white/10 text-lg">⇄</button>
             </div>
             <div id="clist" class="flex-1 overflow-y-auto px-2"></div>
         </div>
@@ -46,11 +38,8 @@
             <div class="p-4 border-b border-white/5 flex items-center justify-between">
                 <div class="flex items-center gap-4">
                     <button onclick="back()" class="md:hidden">←</button>
-                    <img id="apfp" class="w-10 h-10 rounded-full hidden">
-                    <h2 id="aname" class="font-bold text-sm">Select</h2>
-                </div>
-                <div id="c-btns" class="hidden flex gap-5 mr-2">
-                    <button onclick="startCall('voice')">📞</button>
+                    <img id="apfp" class="w-10 h-10 rounded-full hidden border border-white/10 object-cover">
+                    <h2 id="aname" class="font-bold text-sm">Select a Chat</h2>
                 </div>
             </div>
             <div id="msgs" class="flex-1 overflow-y-auto p-6 space-y-4"></div>
@@ -65,116 +54,75 @@
         const socket = io();
         const me = JSON.parse(localStorage.getItem('user'));
         let active = null;
-        let mode = 'contacts';
-        let peer;
+        let currentMode = 'contacts';
 
         if(!me) window.location.href = "/";
         socket.emit('login', me);
 
         function enter(m) {
-            mode = m;
+            currentMode = m;
             document.getElementById('mode-gate').classList.add('hidden');
-            document.getElementById('mode-label').innerText = m.toUpperCase();
-            if(m === 'global') socket.emit('get-online-users');
+            updateUI();
         }
 
-        // --- CONTACTS / GLOBAL LOGIC ---
+        function switchMode() {
+            currentMode = (currentMode === 'contacts') ? 'global' : 'contacts';
+            updateUI();
+        }
+
+        function updateUI() {
+            document.getElementById('sub-label').innerText = currentMode;
+            document.getElementById('clist').innerHTML = ""; // Clear list
+            if(currentMode === 'global') {
+                socket.emit('get-online-users');
+            } else {
+                socket.emit('login', me); // Reload friends
+            }
+        }
+
+        // --- RENDER LOGIC ---
         function render(c, label) {
             const list = document.getElementById('clist');
-            const isG = label === 'GLOBAL ONLINE';
+            const isG = currentMode === 'global';
             const html = c.map(u => `
-                <div onclick="initiate('${u.user}','${u.phone}',${isG},'${u.pfp}')" class="p-4 bg-white/5 rounded-2xl flex justify-between items-center mb-2 cursor-pointer">
+                <div onclick="initiate('${u.user}','${u.phone}',${isG},'${u.pfp}')" class="p-4 bg-white/5 rounded-2xl flex justify-between items-center mb-2 cursor-pointer hover:bg-white/10 transition">
                     <div class="flex items-center gap-3">
                         <img src="${u.pfp}" class="w-10 h-10 rounded-full object-cover">
                         <p class="font-bold text-sm">${u.user}</p>
                     </div>
-                    ${isG ? '<span class="text-blue-400 text-[9px]">+CHAT</span>' : ''}
+                    ${isG ? '<span class="text-blue-400 text-[10px] font-bold">+CHAT</span>' : ''}
                 </div>`).join('');
-            list.innerHTML += `<p class="text-[9px] opacity-30 mt-4 mb-2 ml-2">${label}</p>` + html;
+            list.innerHTML += `<p class="text-[9px] opacity-30 mt-4 mb-2 ml-2 uppercase tracking-widest">${label}</p>` + html;
         }
 
         function initiate(name, phone, isG, pfp) {
             if(isG) {
-                if(confirm(`Request to chat with ${name}?`)) socket.emit('request-contact', { targetPhone: phone, fromUser: me.user });
+                if(confirm(`Chat with ${name}?`)) socket.emit('request-contact', { targetPhone: phone, fromUser: me.user });
             } else {
                 openC({user: name, pfp: pfp});
             }
         }
 
         socket.on('contact-invite', (d) => { if(confirm(d.from + " wants to chat. Accept?")) socket.emit('accept-contact', { to: d.from, from: me.user }); });
-        socket.on('contact-added', () => location.reload());
-        socket.on('load-my-contacts', (c) => render(c, 'FRIENDS'));
-        socket.on('online-list', (c) => render(c, 'GLOBAL ONLINE'));
+        socket.on('contact-added', () => updateUI());
+        socket.on('load-my-contacts', (c) => { if(currentMode === 'contacts') render(c, 'My Friends'); });
+        socket.on('online-list', (c) => { if(currentMode === 'global') render(c, 'Online Now'); });
 
         function openC(u) {
             active = u;
             document.getElementById('aname').innerText = u.user;
             document.getElementById('apfp').src = u.pfp;
             document.getElementById('apfp').classList.remove('hidden');
-            document.getElementById('c-btns').classList.remove('hidden');
             document.getElementById('msgs').innerHTML = "";
             socket.emit('load-history', { from: me.user, to: u.user });
             if(window.innerWidth < 768) { document.getElementById('sidebar').classList.add('hidden'); document.getElementById('chat').classList.remove('hidden'); document.getElementById('chat').classList.add('flex'); }
         }
 
-        // --- WebRTC VOICE ---
-        async function startCall(t) {
-            document.getElementById('call-user').innerText = active.user;
-            document.getElementById('call-pfp').src = active.pfp;
-            document.getElementById('call-screen').classList.remove('hidden');
-            document.getElementById('dial').play();
-            socket.emit('start-call', { to: active.user, from: me.user, type: t, pfp: me.pfp });
-            setupRTC(true, active.user);
-        }
-
-        socket.on('incoming-call', (d) => {
-            active = { user: d.from, pfp: d.pfp };
-            document.getElementById('call-user').innerText = d.from;
-            document.getElementById('call-pfp').src = d.pfp;
-            document.getElementById('call-screen').classList.remove('hidden');
-            document.getElementById('accept-btn').classList.remove('hidden');
-            document.getElementById('ring').play();
-        });
-
-        async function setupRTC(isCaller, target) {
-            peer = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            stream.getTracks().forEach(t => peer.addTrack(t, stream));
-            
-            peer.ontrack = (e) => { const aud = new Audio(); aud.srcObject = e.streams[0]; aud.play(); };
-            peer.onicecandidate = (e) => { if(e.candidate) socket.emit('rtc-signal', { to: target, signal: e.candidate }); };
-
-            if(isCaller) {
-                const offer = await peer.createOffer();
-                await peer.setLocalDescription(offer);
-                socket.emit('rtc-signal', { to: target, signal: offer });
-            }
-        }
-
-        socket.on('rtc-signal', async (d) => {
-            if(!peer) await setupRTC(false, d.from);
-            if(d.signal.type === 'offer') {
-                await peer.setRemoteDescription(new RTCSessionDescription(d.signal));
-                const ans = await peer.createAnswer();
-                await peer.setLocalDescription(ans);
-                socket.emit('rtc-signal', { to: d.from, signal: ans });
-            } else if(d.signal.type === 'answer') {
-                await peer.setRemoteDescription(new RTCSessionDescription(d.signal));
-            } else if(d.signal.candidate) {
-                await peer.addIceCandidate(new RTCIceCandidate(d.signal));
-            }
-        });
-
-        function acceptCall() { document.getElementById('ring').pause(); setupRTC(false, active.user); }
-        function rejectCall() { document.getElementById('ring').pause(); document.getElementById('dial').pause(); document.getElementById('call-screen').classList.add('hidden'); socket.emit('end-call', { to: active.user }); }
-        socket.on('call-ended', () => { document.getElementById('ring').pause(); document.getElementById('dial').pause(); document.getElementById('call-screen').classList.add('hidden'); });
-
-        // --- MESSAGING ---
         function send() {
             const v = document.getElementById('in').value;
             if(v && active) { socket.emit('send-private-msg', { to: active.user, from: me.user, text: v }); document.getElementById('in').value = ""; }
         }
-        socket.on('chat-history', (h) => h.forEach(m => disp(m.sender, m.text)));
+
         socket.on('receive-msg', (d) => { if(active && (d.from === active.user || d.from === me.user)) disp(d.from, d.text); });
         function disp(f, t) {
             const isMe = f === me.user;
