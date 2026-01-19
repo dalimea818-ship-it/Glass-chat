@@ -6,70 +6,99 @@ const path = require('path');
 const fs = require('fs');
 const mongoose = require('mongoose');
 
-// 1. External Storage Connection (MongoDB)
-const MONGO_URI = process.env.MONGO_URI || "YOUR_MONGODB_CONNECTION_STRING_HERE";
-mongoose.connect(MONGO_URI).then(() => console.log("External Message Storage Connected"));
+// --- 1. EXTERNAL MESSAGE STORAGE (MongoDB) ---
+const MONGO_URI = "mongodb+srv://admin:44CE0VlDDcTosDn3@cluster800.mh0idmx.mongodb.net/?appName=Cluster800";
+
+mongoose.connect(MONGO_URI)
+    .then(() => console.log("✅ External MongoDB Connected"))
+    .catch(err => console.error("❌ MongoDB Error:", err));
 
 const MessageSchema = new mongoose.Schema({
-  room: String, // format: "user1-user2" (alphabetical)
-  sender: String,
-  text: String,
-  timestamp: { type: Date, default: Date.now }
+    room: String, // format: "user1-user2" (alphabetical)
+    sender: String,
+    text: String,
+    timestamp: { type: Date, default: Date.now }
 });
 const Message = mongoose.model('Message', MessageSchema);
 
-// 2. Person Storage (Local File)
+// --- 2. LOCAL PERSON STORAGE (users.json) ---
 const dbPath = path.join(__dirname, 'users.json');
-let users = JSON.parse(fs.readFileSync(dbPath, 'utf-8') || "[]");
+let users = [];
+if (fs.existsSync(dbPath)) {
+    users = JSON.parse(fs.readFileSync(dbPath, 'utf-8'));
+}
 
 app.use(express.static(path.join(__dirname, 'public')));
-app.use(express.json({limit: '50mb'}));
+app.use(express.json({ limit: '50mb' }));
 
-io.on('connection', (socket) => {
-  socket.on('login', (data) => {
-    socket.username = data.user;
-    // Update socket ID in local storage
-    const idx = users.findIndex(u => u.user === data.user);
-    if(idx !== -1) users[idx].socketId = socket.id;
-  });
-
-  // Load External History when opening a chat
-  socket.on('load-history', async (data) => {
-    const room = [data.from, data.to].sort().join('-');
-    const history = await Message.find({ room }).sort({ timestamp: 1 }).limit(50);
-    socket.emit('chat-history', history);
-  });
-
-  socket.on('send-private-msg', async (data) => {
-    const room = [data.from, data.to].sort().join('-');
-    
-    // Save to External Storage
-    const newMsg = new Message({ room, sender: data.from, text: data.text });
-    await newMsg.save();
-
-    // Send to Target if online
-    const target = users.find(u => u.user === data.to);
-    if (target && target.socketId) {
-      io.to(target.socketId).emit('receive-msg', data);
+// --- 3. ROUTES ---
+app.post('/signup', (req, res) => {
+    const { user, phone, pass, pfp } = req.body;
+    if (users.find(u => u.user === user || u.phone === phone)) {
+        return res.status(400).send("User or Phone already exists");
     }
-    socket.emit('receive-msg', data); // Echo to sender
-  });
-
-  // Handle Contact Requests (Saves to users.json)
-  socket.on('accept-contact', (data) => {
-    const me = users.find(u => u.user === data.from);
-    const them = users.find(u => u.user === data.to);
-    
-    if(!me.contacts) me.contacts = [];
-    if(!them.contacts) them.contacts = [];
-    
-    me.contacts.push(data.to);
-    them.contacts.push(data.from);
-    
+    const newUser = { user, phone, pass, pfp, contacts: [] };
+    users.push(newUser);
     fs.writeFileSync(dbPath, JSON.stringify(users, null, 2));
-    io.to(me.socketId).emit('contact-added', them);
-    io.to(them.socketId).emit('contact-added', me);
-  });
+    res.sendStatus(200);
 });
 
-http.listen(process.env.PORT || 3000);
+app.post('/login', (req, res) => {
+    const match = users.find(u => u.user === req.body.user && u.pass === req.body.pass);
+    if (match) res.json(match);
+    else res.status(401).send("Invalid credentials");
+});
+
+// --- 4. REAL-TIME LOGIC ---
+let onlineUsers = {};
+
+io.on('connection', (socket) => {
+    socket.on('login', (data) => {
+        socket.username = data.user;
+        onlineUsers[data.user] = { socketId: socket.id, ...data };
+        
+        // Load saved contacts from users.json
+        const myData = users.find(u => u.user === data.user);
+        const myContacts = users.filter(u => myData.contacts.includes(u.user));
+        socket.emit('load-my-contacts', myContacts);
+    });
+
+    socket.on('request-contact', (data) => {
+        const target = Object.values(onlineUsers).find(u => u.phone === data.targetPhone);
+        if (target) io.to(target.socketId).emit('contact-invite', { from: data.fromUser });
+    });
+
+    socket.on('accept-contact', (data) => {
+        const me = users.find(u => u.user === data.from);
+        const them = users.find(u => u.user === data.to);
+        if (me && them) {
+            if (!me.contacts.includes(them.user)) me.contacts.push(them.user);
+            if (!them.contacts.includes(me.user)) them.contacts.push(me.user);
+            fs.writeFileSync(dbPath, JSON.stringify(users, null, 2));
+            
+            // Notify both if online
+            if (onlineUsers[me.user]) io.to(onlineUsers[me.user].socketId).emit('contact-added', them);
+            if (onlineUsers[them.user]) io.to(onlineUsers[them.user].socketId).emit('contact-added', me);
+        }
+    });
+
+    socket.on('load-history', async (data) => {
+        const room = [data.from, data.to].sort().join('-');
+        const history = await Message.find({ room }).sort({ timestamp: 1 }).limit(100);
+        socket.emit('chat-history', history);
+    });
+
+    socket.on('send-private-msg', async (data) => {
+        const room = [data.from, data.to].sort().join('-');
+        const newMsg = new Message({ room, sender: data.from, text: data.text });
+        await newMsg.save();
+
+        const target = onlineUsers[data.to];
+        if (target) io.to(target.socketId).emit('receive-msg', data);
+        socket.emit('receive-msg', data);
+    });
+
+    socket.on('disconnect', () => { delete onlineUsers[socket.username]; });
+});
+
+http.listen(process.env.PORT || 3000, () => console.log("Server running..."));
