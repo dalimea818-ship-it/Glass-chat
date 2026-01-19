@@ -1,250 +1,146 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <link rel="manifest" href="/manifest.json">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="/socket.io/socket.io.js"></script>
   <style>
-    :root { --msg-color: #ffffff; }
-    @keyframes rainbow { 0% { filter: hue-rotate(0deg); } 100% { filter: hue-rotate(360deg); } }
-    body { 
-      background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab); 
-      background-size: 400% 400%; animation: river 15s ease infinite, rainbow 20s linear infinite;
-      height: 100vh; overflow: hidden; font-family: sans-serif; color: white;
-    }
-    @keyframes river { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
-    .glass { background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(40px); border: 1px solid rgba(255, 255, 255, 0.2); }
-    .msg-mine { background: var(--msg-color) !important; color: black; }
+    body { background: #000; color: white; height: 100vh; overflow: hidden; }
+    .glass { background: rgba(255,255,255,0.03); backdrop-filter: blur(20px); }
     .hidden { display: none !important; }
-    
-    /* Mobile Responsive Tweaks */
-    @media (max-width: 768px) {
-      .desktop-sidebar { display: none; }
-      .mobile-menu { display: block; }
-    }
   </style>
 </head>
-<body class="flex items-center justify-center p-2 sm:p-6">
-  
-  <div class="glass w-full max-w-7xl h-[95vh] rounded-[2rem] flex overflow-hidden shadow-2xl relative">
+<body class="flex items-center justify-center p-0 md:p-6">
+
+  <div id="tutorial" class="hidden fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-8 text-center">
+    <div>
+      <div class="text-6xl mb-4">✨</div>
+      <h2 class="text-2xl font-bold mb-2">Welcome to Glass Pro</h2>
+      <p class="opacity-60 mb-8 text-sm">To start chatting, search for a friend's phone number. You'll only see people who accept your request.</p>
+      <button onclick="closeTutorial()" class="w-full py-4 bg-white text-black rounded-2xl font-bold">START</button>
+    </div>
+  </div>
+
+  <div class="glass w-full max-w-6xl h-full md:h-[90vh] md:rounded-[2.5rem] flex overflow-hidden border border-white/10">
     
-    <div class="w-80 border-r border-white/10 flex flex-col bg-black/20 desktop-sidebar">
-      <div class="p-6 flex items-center gap-4 border-b border-white/10">
-        <img id="my-pfp" class="w-12 h-12 rounded-full object-cover border border-white/20">
-        <div>
-          <h2 id="my-name" class="font-bold"></h2>
-          <button onclick="logout()" class="text-[10px] opacity-50 uppercase hover:text-white">Logout</button>
+    <div id="sidebar" class="w-full md:w-80 flex flex-col border-r border-white/5">
+      <div class="p-6 flex justify-between items-center">
+        <h1 class="text-xl font-black italic">Glass</h1>
+        <img id="my-pfp" class="w-8 h-8 rounded-full border border-white/20">
+      </div>
+      
+      <div class="px-4 mb-4">
+        <div class="bg-white/5 rounded-xl flex items-center px-3 border border-white/10">
+          <input id="search-input" placeholder="Enter phone number..." class="w-full p-3 bg-transparent text-xs outline-none">
+          <button onclick="addContact()" class="text-blue-400 text-[10px] font-bold">ADD</button>
         </div>
       </div>
-      <div class="p-4 text-[10px] uppercase opacity-40 font-bold tracking-widest">Online Friends</div>
-      <div id="contact-list" class="flex-1 overflow-y-auto p-2"></div>
+
+      <div id="contact-list" class="flex-1 overflow-y-auto px-2 space-y-1">
+        <p class="text-[10px] opacity-30 text-center mt-10 uppercase tracking-widest">No contacts yet</p>
+      </div>
     </div>
 
-    <div class="flex-1 flex flex-col relative">
-      <div class="p-4 border-b border-white/10 flex items-center justify-between bg-black/10 backdrop-blur-md z-10">
-        <div class="flex items-center gap-3">
-          <h2 class="font-bold text-lg">Global Chat</h2>
-        </div>
-        <div class="flex gap-4">
-           <button onclick="toggleSettings()" class="opacity-60 hover:opacity-100">⚙️</button>
-        </div>
+    <div id="chat-window" class="hidden md:flex flex-1 flex-col bg-white/[0.01]">
+      <div class="p-4 border-b border-white/5 flex items-center gap-4">
+        <button onclick="goBack()" class="md:hidden text-xl">←</button>
+        <img id="active-pfp" class="w-10 h-10 rounded-full hidden">
+        <h2 id="active-name" class="font-bold text-sm">Select a contact</h2>
       </div>
 
       <div id="messages" class="flex-1 overflow-y-auto p-6 space-y-4"></div>
 
-      <div class="p-4 bg-black/20 flex gap-3 items-center">
-        <label class="cursor-pointer p-2 hover:bg-white/10 rounded-full transition">
-           📎 <input type="file" class="hidden" id="file-in" onchange="handleFile(this)">
-        </label>
-        <input id="msg-input" placeholder="Message..." class="flex-1 bg-white/10 p-3 rounded-2xl outline-none border border-white/5 transition focus:bg-white/20">
-        <button onclick="send()" class="bg-white text-black px-6 py-3 rounded-2xl font-bold hover:scale-105 transition">SEND</button>
+      <div class="p-4 flex gap-2">
+        <input id="msg-input" placeholder="Message..." class="flex-1 bg-white/5 p-4 rounded-2xl outline-none border border-white/5">
+        <button onclick="send()" class="bg-white text-black px-6 rounded-2xl font-bold">➜</button>
       </div>
-      
-      <div id="media-preview" class="hidden absolute bottom-20 left-4 bg-black p-2 rounded-xl border border-white/20">
-         <img id="prev-img" class="h-20 rounded-lg">
-         <button onclick="clearFile()" class="absolute -top-2 -right-2 bg-red-500 rounded-full w-6 h-6 text-xs">X</button>
-      </div>
-    </div>
-
-    <div id="settings-panel" class="hidden absolute inset-0 glass z-40 p-10 flex flex-col items-center justify-center">
-        <h2 class="text-3xl font-black mb-8">Settings</h2>
-        <div class="bg-black/40 p-8 rounded-3xl space-y-6 w-full max-w-md">
-           <div>
-             <label class="block text-xs opacity-50 mb-2">Message Bubble Color</label>
-             <input type="color" onchange="document.documentElement.style.setProperty('--msg-color', this.value)" class="w-full h-10 rounded-lg cursor-pointer">
-           </div>
-           <div>
-             <label class="block text-xs opacity-50 mb-2">Custom Background</label>
-             <input type="file" onchange="changeBG(this)" class="text-xs">
-           </div>
-           <button onclick="toggleSettings()" class="w-full py-3 bg-white text-black rounded-xl font-bold mt-4">Close</button>
-        </div>
-    </div>
-  </div>
-
-  <div id="call-overlay" class="hidden fixed inset-0 z-[100] bg-black flex flex-col">
-    <video id="remoteVideo" autoplay playsinline class="flex-1 object-cover opacity-50"></video>
-    <video id="localVideo" autoplay muted playsinline class="absolute top-5 right-5 w-32 h-48 bg-gray-800 rounded-2xl border-2 border-white/20 object-cover z-20"></video>
-    
-    <div class="absolute bottom-10 left-0 right-0 flex justify-center gap-6 pb-10">
-      <button onclick="toggleMute()" id="mute-btn" class="w-16 h-16 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-2xl">🎙️</button>
-      <button onclick="toggleVideo()" id="vid-btn" class="w-16 h-16 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-2xl">📹</button>
-      <button onclick="applyFilter()" class="w-16 h-16 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-xs font-bold">FX</button>
-      <button onclick="endCall()" class="w-20 h-20 rounded-full bg-red-600 flex items-center justify-center text-3xl shadow-xl hover:scale-110 transition">📞</button>
-    </div>
-    
-    <div id="incoming-alert" class="hidden absolute top-20 left-1/2 -translate-x-1/2 bg-white/10 backdrop-blur-xl p-6 rounded-3xl border border-white/20 text-center w-64 animate-bounce">
-       <img id="caller-pfp" class="w-16 h-16 rounded-full mx-auto mb-2 bg-black">
-       <p class="font-bold mb-4"><span id="caller-name">User</span> is calling...</p>
-       <div class="flex justify-center gap-4">
-         <button onclick="answerCall()" class="bg-green-500 px-4 py-2 rounded-xl font-bold">Answer</button>
-         <button onclick="rejectCall()" class="bg-red-500 px-4 py-2 rounded-xl font-bold">Decline</button>
-       </div>
     </div>
   </div>
 
   <script>
     const socket = io();
-    const ringtone = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3');
-    ringtone.loop = true;
-
-    // Load User
     const me = JSON.parse(localStorage.getItem('user'));
-    if(!me) location.href = '/';
+    let activeChat = null;
+    let myContacts = [];
+
+    // Login & Tutorial
+    if(!me) window.location.href = "/";
     document.getElementById('my-pfp').src = me.pfp;
-    document.getElementById('my-name').innerText = me.user;
-    
-    // Connect
     socket.emit('login', me);
 
-    // Notification Logic
-    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
-    if ("Notification" in window) Notification.requestPermission();
+    if(!localStorage.getItem('setup')) {
+      document.getElementById('tutorial').classList.remove('hidden');
+    }
+    function closeTutorial() {
+      document.getElementById('tutorial').classList.add('hidden');
+      localStorage.setItem('setup', 'true');
+    }
 
-    // -- Chat Logic --
-    let fileData = null;
-    
-    function send() {
-      const text = document.getElementById('msg-input').value;
-      if(text || fileData) {
-        socket.emit('send-msg', { user: me.user, text, pfp: me.pfp, media: fileData });
-        document.getElementById('msg-input').value = "";
-        clearFile();
+    // Contact Logic
+    function addContact() {
+      const phone = document.getElementById('search-input').value;
+      socket.emit('request-contact', { targetPhone: phone, fromUser: me.user, fromPfp: me.pfp });
+      alert("Request Sent!");
+    }
+
+    socket.on('contact-invite', (data) => {
+      if(confirm(data.from + " wants to add you. Accept?")) {
+        socket.emit('accept-contact', { to: data.from, from: me.user });
+      }
+    });
+
+    socket.on('contact-added', (user) => {
+      myContacts.push(user);
+      renderContacts();
+    });
+
+    function renderContacts() {
+      const list = document.getElementById('contact-list');
+      list.innerHTML = myContacts.map(u => `
+        <div onclick='openChat(${JSON.stringify(u)})' class="p-4 flex items-center gap-4 hover:bg-white/5 rounded-2xl cursor-pointer">
+          <img src="${u.pfp}" class="w-12 h-12 rounded-full object-cover">
+          <div><p class="font-bold text-sm">${u.user}</p><p class="text-[10px] opacity-40">Online</p></div>
+        </div>
+      `).join('');
+    }
+
+    // Navigation Logic
+    function openChat(user) {
+      activeChat = user;
+      document.getElementById('active-name').innerText = user.user;
+      document.getElementById('active-pfp').src = user.pfp;
+      document.getElementById('active-pfp').classList.remove('hidden');
+      
+      if(window.innerWidth < 768) {
+        document.getElementById('sidebar').classList.add('hidden');
+        document.getElementById('chat-window').classList.remove('hidden');
+        document.getElementById('chat-window').classList.add('flex');
       }
     }
 
-    function handleFile(input) {
-      const r = new FileReader();
-      r.onload = (e) => {
-        fileData = e.target.result;
-        document.getElementById('prev-img').src = fileData;
-        document.getElementById('media-preview').classList.remove('hidden');
-      };
-      r.readAsDataURL(input.files[0]);
-    }
-    
-    function clearFile() {
-       fileData = null;
-       document.getElementById('media-preview').classList.add('hidden');
-       document.getElementById('file-in').value = "";
+    function goBack() {
+      document.getElementById('sidebar').classList.remove('hidden');
+      document.getElementById('chat-window').classList.add('hidden');
+      document.getElementById('chat-window').classList.remove('flex');
     }
 
-    socket.on('receive-msg', (msg) => {
+    function send() {
+      const text = document.getElementById('msg-input').value;
+      if(text && activeChat) {
+        socket.emit('send-private-msg', { to: activeChat.user, from: me.user, text, pfp: me.pfp });
+        document.getElementById('msg-input').value = "";
+      }
+    }
+
+    socket.on('receive-msg', (data) => {
+      const isMe = data.from === me.user;
       const div = document.createElement('div');
-      const isMe = msg.user === me.user;
-      div.className = "flex gap-3 " + (isMe ? "flex-row-reverse" : "");
-      
-      let content = "";
-      if(msg.media) content += `<img src="${msg.media}" class="rounded-xl max-w-[200px] mb-2 block">`;
-      if(msg.text) content += msg.text;
-
-      div.innerHTML = `
-        <img src="${msg.pfp}" class="w-8 h-8 rounded-full object-cover self-end">
-        <div class="p-3 rounded-2xl max-w-xs ${isMe ? 'msg-mine shadow-lg' : 'bg-white/10'}">
-          <p class="text-[9px] font-bold opacity-40 mb-1 uppercase">${msg.user}</p>
-          ${content}
-        </div>`;
+      div.className = `flex ${isMe ? 'justify-end' : 'justify-start'}`;
+      div.innerHTML = `<div class="p-3 rounded-2xl max-w-[70%] ${isMe ? 'bg-white text-black' : 'bg-white/10 text-white'}">${data.text}</div>`;
       document.getElementById('messages').appendChild(div);
-      document.getElementById('messages').scrollTop = 99999;
+      document.getElementById('messages').scrollTop = 9999;
     });
-
-    socket.on('update-online', (list) => {
-      document.getElementById('contact-list').innerHTML = list.map(u => u.user === me.user ? '' : `
-        <div class="p-3 flex items-center gap-3 hover:bg-white/5 rounded-xl cursor-pointer group">
-          <img src="${u.pfp}" class="w-10 h-10 rounded-full object-cover border border-white/10">
-          <div class="flex-1">
-            <p class="font-bold text-sm group-hover:text-blue-400 transition">${u.user}</p>
-            <p class="text-[9px] opacity-40 uppercase">ID: ${u.vid}</p>
-          </div>
-          <button onclick="startCall('${u.user}')" class="text-xl hover:scale-125 transition">📞</button>
-        </div>
-      `).join('');
-    });
-
-    // -- Call Logic --
-    let activeCall = null;
-    let localStream = null;
-    let isMuted = false;
-    let isVidOff = false;
-
-    async function startCall(targetUser) {
-       document.getElementById('call-overlay').classList.remove('hidden');
-       try {
-         localStream = await navigator.mediaDevices.getUserMedia({video:true, audio:true});
-         document.getElementById('localVideo').srcObject = localStream;
-         ringtone.play();
-         socket.emit('call-request', { to: targetUser, from: me.user, pfp: me.pfp });
-       } catch(e) { alert("Camera Access Denied"); endCall(); }
-    }
-
-    socket.on('incoming-call', (data) => {
-       document.getElementById('call-overlay').classList.remove('hidden');
-       document.getElementById('incoming-alert').classList.remove('hidden');
-       document.getElementById('caller-name').innerText = data.from;
-       document.getElementById('caller-pfp').src = data.pfp;
-       ringtone.play();
-       activeCall = data.from;
-       
-       if(document.hidden) new Notification("Incoming Call from " + data.from);
-    });
-
-    socket.on('stop-ringing', () => { ringtone.pause(); ringtone.currentTime = 0; });
-
-    function answerCall() {
-       document.getElementById('incoming-alert').classList.add('hidden');
-       ringtone.pause();
-       // In a real app, you would initiate WebRTC Peer Connection here
-       navigator.mediaDevices.getUserMedia({video:true, audio:true}).then(s => {
-         document.getElementById('localVideo').srcObject = s;
-         localStream = s;
-       });
-    }
-
-    function rejectCall() {
-       socket.emit('call-rejected', { to: activeCall });
-       endCall();
-    }
-
-    function endCall() {
-       document.getElementById('call-overlay').classList.add('hidden');
-       document.getElementById('incoming-alert').classList.add('hidden');
-       if(localStream) localStream.getTracks().forEach(t => t.stop());
-       ringtone.pause(); ringtone.currentTime = 0;
-    }
-
-    // -- Utilities --
-    function toggleSettings() { document.getElementById('settings-panel').classList.toggle('hidden'); }
-    function logout() { localStorage.clear(); location.href = '/'; }
-    function changeBG(i) {
-      const r = new FileReader();
-      r.onload = (e) => { document.body.style.background = `url(${e.target.result}) center/cover`; document.body.style.animation = "none"; };
-      r.readAsDataURL(i.files[0]);
-    }
-    function toggleMute() { isMuted = !isMuted; localStream.getAudioTracks()[0].enabled = !isMuted; document.getElementById('mute-btn').style.opacity = isMuted ? 0.5 : 1; }
-    function toggleVideo() { isVidOff = !isVidOff; localStream.getVideoTracks()[0].enabled = !isVidOff; document.getElementById('vid-btn').style.opacity = isVidOff ? 0.5 : 1; }
-    let filterIdx = 0;
-    const filters = ['none', 'grayscale(1)', 'sepia(1)', 'hue-rotate(90deg)'];
-    function applyFilter() { filterIdx = (filterIdx + 1) % filters.length; document.getElementById('localVideo').style.filter = filters[filterIdx]; }
   </script>
 </body>
 </html>
