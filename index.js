@@ -3,50 +3,47 @@ const app = express();
 const http = require('http').Server(app);
 const io = require('socket.io')(http);
 const path = require('path');
-const fs = require('fs');
 const mongoose = require('mongoose');
 
-// 1. DATABASE
+// 1. DATABASE CONNECTION (Replace YOUR_PASSWORD)
 const MONGO_URI = "mongodb+srv://admin:44CE0VlDDcTosDn3@cluster800.mh0idmx.mongodb.net/?appName=Cluster800";
-mongoose.connect(MONGO_URI).then(() => console.log("✅ DB Connected")).catch(err => console.log(err));
+mongoose.connect(MONGO_URI).then(() => console.log("✅ MongoDB Connected")).catch(err => console.log(err));
+
+// 2. MODELS (Stored in DB, not files)
+const User = mongoose.model('User', new mongoose.Schema({
+    user: String, phone: String, pass: String, pfp: String, contacts: [String]
+}));
 
 const Message = mongoose.model('Message', new mongoose.Schema({
     room: String, sender: String, text: String, timestamp: { type: Date, default: Date.now }
 }));
 
-const dbPath = path.join(__dirname, 'users.json');
-if (!fs.existsSync(dbPath)) fs.writeFileSync(dbPath, '[]');
-let users = JSON.parse(fs.readFileSync(dbPath, 'utf-8'));
-
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json({ limit: '50mb' }));
 
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
-app.get('/chat', (req, res) => res.sendFile(path.join(__dirname, 'public', 'chat.html')));
-
-// --- AUTH ---
-app.post('/signup', (req, res) => {
+// 3. AUTH ROUTES (Using MongoDB)
+app.post('/signup', async (req, res) => {
     const { user, phone, pass, pfp } = req.body;
-    if (users.find(u => u.user === user || u.phone === phone)) return res.status(400).send("Taken");
-    const newUser = { user, phone, pass, pfp, contacts: [] };
-    users.push(newUser);
-    fs.writeFileSync(dbPath, JSON.stringify(users, null, 2));
+    const exists = await User.findOne({ $or: [{ user }, { phone }] });
+    if (exists) return res.status(400).send("Taken");
+    await new User({ user, phone, pass, pfp, contacts: [] }).save();
     res.sendStatus(200);
 });
 
-app.post('/login', (req, res) => {
-    const match = users.find(u => u.user === req.body.user && u.pass === req.body.pass);
+app.post('/login', async (req, res) => {
+    const match = await User.findOne({ user: req.body.user, pass: req.body.pass });
     if (match) res.json(match); else res.status(401).send("Invalid");
 });
 
-// --- SOCKETS ---
+// 4. SOCKET LOGIC
 let onlineUsers = {};
 io.on('connection', (socket) => {
-    socket.on('login', (data) => {
+    socket.on('login', async (data) => {
         socket.username = data.user;
         onlineUsers[data.user] = { socketId: socket.id, ...data };
-        const myData = users.find(u => u.user === data.user);
-        socket.emit('load-my-contacts', users.filter(u => myData.contacts.includes(u.user)));
+        const myData = await User.findOne({ user: data.user });
+        const myContacts = await User.find({ user: { $in: myData.contacts } });
+        socket.emit('load-my-contacts', myContacts);
     });
 
     socket.on('get-online-users', () => {
@@ -55,44 +52,23 @@ io.on('connection', (socket) => {
         socket.emit('online-list', list);
     });
 
-    // Invite Logic
     socket.on('request-contact', (data) => {
         const target = Object.values(onlineUsers).find(u => u.phone === data.targetPhone);
         if (target) io.to(target.socketId).emit('contact-invite', { from: data.fromUser });
     });
 
-    socket.on('accept-contact', (data) => {
-        const me = users.find(u => u.user === data.from);
-        const them = users.find(u => u.user === data.to);
-        if (me && them) {
-            if (!me.contacts.includes(them.user)) me.contacts.push(them.user);
-            if (!them.contacts.includes(me.user)) them.contacts.push(me.user);
-            fs.writeFileSync(dbPath, JSON.stringify(users, null, 2));
-            if (onlineUsers[me.user]) io.to(onlineUsers[me.user].socketId).emit('contact-added', them);
-            if (onlineUsers[them.user]) io.to(onlineUsers[them.user].socketId).emit('contact-added', me);
-        }
+    socket.on('accept-contact', async (data) => {
+        await User.updateOne({ user: data.from }, { $addToSet: { contacts: data.to } });
+        await User.updateOne({ user: data.to }, { $addToSet: { contacts: data.from } });
+        const them = await User.findOne({ user: data.to });
+        const me = await User.findOne({ user: data.from });
+        if (onlineUsers[me.user]) io.to(onlineUsers[me.user].socketId).emit('contact-added', them);
+        if (onlineUsers[them.user]) io.to(onlineUsers[them.user].socketId).emit('contact-added', me);
     });
 
-    // Signaling for WebRTC
     socket.on('rtc-signal', (data) => {
         const target = onlineUsers[data.to];
         if (target) io.to(target.socketId).emit('rtc-signal', { from: socket.username, signal: data.signal });
-    });
-
-    socket.on('start-call', (data) => {
-        const target = onlineUsers[data.to];
-        if (target) io.to(target.socketId).emit('incoming-call', { from: data.from, type: data.type, pfp: data.pfp });
-    });
-
-    socket.on('end-call', (data) => {
-        const target = onlineUsers[data.to];
-        if (target) io.to(target.socketId).emit('call-ended');
-    });
-
-    socket.on('load-history', async (data) => {
-        const room = [data.from, data.to].sort().join('-');
-        const history = await Message.find({ room }).sort({ timestamp: 1 }).limit(50);
-        socket.emit('chat-history', history);
     });
 
     socket.on('send-private-msg', async (data) => {
