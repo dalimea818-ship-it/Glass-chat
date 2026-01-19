@@ -14,7 +14,6 @@ const Message = mongoose.model('Message', new mongoose.Schema({
     room: String, sender: String, text: String, timestamp: { type: Date, default: Date.now }
 }));
 
-// 2. PERSON STORAGE
 const dbPath = path.join(__dirname, 'users.json');
 if (!fs.existsSync(dbPath)) fs.writeFileSync(dbPath, '[]');
 let users = JSON.parse(fs.readFileSync(dbPath, 'utf-8'));
@@ -25,6 +24,7 @@ app.use(express.json({ limit: '50mb' }));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 app.get('/chat', (req, res) => res.sendFile(path.join(__dirname, 'public', 'chat.html')));
 
+// --- AUTH ---
 app.post('/signup', (req, res) => {
     const { user, phone, pass, pfp } = req.body;
     if (users.find(u => u.user === user || u.phone === phone)) return res.status(400).send("Taken");
@@ -39,34 +39,23 @@ app.post('/login', (req, res) => {
     if (match) res.json(match); else res.status(401).send("Invalid");
 });
 
-// 3. SOCKET LOGIC
+// --- SOCKETS ---
 let onlineUsers = {};
 io.on('connection', (socket) => {
     socket.on('login', (data) => {
         socket.username = data.user;
         onlineUsers[data.user] = { socketId: socket.id, ...data };
         const myData = users.find(u => u.user === data.user);
-        const myContacts = users.filter(u => myData.contacts.includes(u.user));
-        socket.emit('load-my-contacts', myContacts);
+        socket.emit('load-my-contacts', users.filter(u => myData.contacts.includes(u.user)));
     });
 
     socket.on('get-online-users', () => {
-        const list = Object.values(onlineUsers)
-            .filter(u => u.user !== socket.username) // Filter out yourself
+        const list = Object.values(onlineUsers).filter(u => u.user !== socket.username)
             .map(u => ({ user: u.user, pfp: u.pfp, phone: u.phone }));
         socket.emit('online-list', list);
     });
 
-    socket.on('start-call', (data) => {
-        const target = onlineUsers[data.to];
-        if (target) io.to(target.socketId).emit('incoming-call', { from: data.from, type: data.type, pfp: data.pfp });
-    });
-
-    socket.on('end-call', (data) => {
-        const target = onlineUsers[data.to];
-        if (target) io.to(target.socketId).emit('call-ended');
-    });
-
+    // Invite Logic
     socket.on('request-contact', (data) => {
         const target = Object.values(onlineUsers).find(u => u.phone === data.targetPhone);
         if (target) io.to(target.socketId).emit('contact-invite', { from: data.fromUser });
@@ -84,9 +73,25 @@ io.on('connection', (socket) => {
         }
     });
 
+    // Signaling for WebRTC
+    socket.on('rtc-signal', (data) => {
+        const target = onlineUsers[data.to];
+        if (target) io.to(target.socketId).emit('rtc-signal', { from: socket.username, signal: data.signal });
+    });
+
+    socket.on('start-call', (data) => {
+        const target = onlineUsers[data.to];
+        if (target) io.to(target.socketId).emit('incoming-call', { from: data.from, type: data.type, pfp: data.pfp });
+    });
+
+    socket.on('end-call', (data) => {
+        const target = onlineUsers[data.to];
+        if (target) io.to(target.socketId).emit('call-ended');
+    });
+
     socket.on('load-history', async (data) => {
         const room = [data.from, data.to].sort().join('-');
-        const history = await Message.find({ room }).sort({ timestamp: 1 }).limit(100);
+        const history = await Message.find({ room }).sort({ timestamp: 1 }).limit(50);
         socket.emit('chat-history', history);
     });
 
@@ -97,7 +102,7 @@ io.on('connection', (socket) => {
         socket.emit('receive-msg', data);
     });
 
-    socket.on('disconnect', () => { delete onlineUsers[socket.username]; });
+    socket.on('disconnect', () => delete onlineUsers[socket.username]);
 });
 
 http.listen(process.env.PORT || 3000);
