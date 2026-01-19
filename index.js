@@ -5,22 +5,21 @@ const io = require('socket.io')(http);
 const path = require('path');
 const mongoose = require('mongoose');
 
-// 1. DATABASE CONNECTION
+// DATABASE
 const MONGO_URI = "mongodb+srv://admin:44CE0VlDDcTosDn3@cluster800.mh0idmx.mongodb.net/?appName=Cluster800";
-mongoose.connect(MONGO_URI).then(() => console.log("✅ MongoDB Connected")).catch(err => console.log(err));
+mongoose.connect(MONGO_URI).then(() => console.log("✅ MongoDB Live")).catch(err => console.log(err));
 
-// 2. MODELS
 const User = mongoose.model('User', new mongoose.Schema({
     user: String, phone: String, pass: String, pfp: String, contacts: [String]
 }));
 const Message = mongoose.model('Message', new mongoose.Schema({
-    room: String, sender: String, text: String, timestamp: { type: Date, default: Date.now }
+    room: String, sender: String, text: String, fileType: String, fileName: String, timestamp: { type: Date, default: Date.now }
 }));
 
+// Payload limits increased for .mp4 and large files
 app.use(express.static(path.join(__dirname, 'public')));
-app.use(express.json({ limit: '50mb' }));
+app.use(express.json({ limit: '100mb' })); 
 
-// 3. ROUTES
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 app.get('/chat', (req, res) => res.sendFile(path.join(__dirname, 'public', 'chat.html')));
 
@@ -37,15 +36,14 @@ app.post('/login', async (req, res) => {
     if (match) res.json(match); else res.status(401).send("Invalid");
 });
 
-// 4. SOCKETS
 let onlineUsers = {};
 io.on('connection', (socket) => {
     socket.on('login', async (data) => {
         socket.username = data.user;
         onlineUsers[data.user] = { socketId: socket.id, ...data };
         const myData = await User.findOne({ user: data.user });
-        const myContacts = await User.find({ user: { $in: myData.contacts } });
-        socket.emit('load-my-contacts', myContacts);
+        const friends = await User.find({ user: { $in: myData.contacts } });
+        socket.emit('load-my-contacts', friends);
     });
 
     socket.on('get-online-users', () => {
@@ -70,15 +68,14 @@ io.on('connection', (socket) => {
 
     socket.on('send-private-msg', async (data) => {
         const room = [data.from, data.to].sort().join('-');
-        await new Message({ room, sender: data.from, text: data.text }).save();
+        await new Message(data).save(); // Saves text, fileType, and fileName
         if (onlineUsers[data.to]) io.to(onlineUsers[data.to].socketId).emit('receive-msg', data);
         socket.emit('receive-msg', data);
     });
 
-    socket.on('load-history', async (data) => {
-        const room = [data.from, data.to].sort().join('-');
-        const history = await Message.find({ room }).sort({ timestamp: 1 }).limit(50);
-        socket.emit('chat-history', history);
+    socket.on('rtc-signal', (data) => {
+        const target = onlineUsers[data.to];
+        if (target) io.to(target.socketId).emit('rtc-signal', { from: socket.username, signal: data.signal });
     });
 
     socket.on('disconnect', () => delete onlineUsers[socket.username]);
