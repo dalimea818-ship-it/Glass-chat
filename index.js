@@ -7,7 +7,7 @@ const fs = require('fs');
 const mongoose = require('mongoose');
 
 // 1. DATABASE CONNECTIONS
-const MONGO_URI = "mongodb+srv://admin:YOUR_PASSWORD@cluster800.mh0idmx.mongodb.net/?appName=Cluster800";
+const MONGO_URI = "mongodb+srv://admin:44CE0VlDDcTosDn3@cluster800.mh0idmx.mongodb.net/?appName=Cluster800";
 
 mongoose.connect(MONGO_URI)
     .then(() => console.log("✅ MongoDB Connected"))
