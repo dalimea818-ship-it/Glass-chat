@@ -11,25 +11,28 @@
     </style>
 </head>
 <body class="flex items-center justify-center md:p-6">
+    <div id="tuto" class="hidden fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-8 text-center">
+        <div><h2 class="text-2xl font-bold mb-4">Welcome to Glass</h2><p class="opacity-50 mb-8">Search for a phone number to add contacts.</p><button onclick="done()" class="bg-white text-black px-12 py-4 rounded-2xl font-bold">START</button></div>
+    </div>
+
     <div class="glass w-full max-w-6xl h-full md:h-[90vh] md:rounded-[2.5rem] flex overflow-hidden border border-white/10 relative">
-        
         <div id="sidebar" class="w-full md:w-80 flex flex-col border-r border-white/5">
             <div class="p-6 flex justify-between items-center">
-                <h1 class="text-xl font-black italic">Glass</h1>
-                <input id="search" placeholder="Phone #" class="bg-white/5 p-2 rounded-lg text-[10px] w-24 outline-none">
-                <button onclick="addContact()" class="text-xs font-bold text-blue-400">ADD</button>
+                <h1 class="font-black italic">Glass</h1>
+                <div class="flex gap-2"><input id="sch" placeholder="Phone#" class="bg-white/5 p-2 rounded text-[10px] w-20 outline-none"><button onclick="add()" class="text-xs text-blue-400">ADD</button></div>
             </div>
-            <div id="contact-list" class="flex-1 overflow-y-auto p-2 space-y-2"></div>
+            <div id="clist" class="flex-1 overflow-y-auto p-2 space-y-2"></div>
         </div>
 
-        <div id="chat-window" class="hidden md:flex flex-1 flex-col bg-white/[0.01]">
+        <div id="chat" class="hidden md:flex flex-1 flex-col bg-white/[0.01]">
             <div class="p-4 border-b border-white/5 flex items-center gap-4">
-                <button onclick="goBack()" class="md:hidden">←</button>
-                <h2 id="active-name" class="font-bold text-sm">Select Contact</h2>
+                <button onclick="back()" class="md:hidden">←</button>
+                <img id="apfp" class="w-8 h-8 rounded-full hidden">
+                <h2 id="aname" class="font-bold text-sm">Select Contact</h2>
             </div>
-            <div id="messages" class="flex-1 overflow-y-auto p-6 space-y-4"></div>
+            <div id="msgs" class="flex-1 overflow-y-auto p-6 space-y-4"></div>
             <div class="p-4 flex gap-2">
-                <input id="msg-input" placeholder="Message..." class="flex-1 bg-white/5 p-4 rounded-2xl outline-none">
+                <input id="in" placeholder="Message..." class="flex-1 bg-white/5 p-4 rounded-2xl outline-none">
                 <button onclick="send()" class="bg-white text-black px-6 rounded-2xl font-bold">➜</button>
             </div>
         </div>
@@ -38,69 +41,48 @@
     <script>
         const socket = io();
         const me = JSON.parse(localStorage.getItem('user'));
-        let activeChat = null;
-
+        let active = null;
+        if(!me) window.location.href = "/";
+        if(!localStorage.getItem('ok')) document.getElementById('tuto').classList.remove('hidden');
+        function done() { localStorage.setItem('ok', '1'); document.getElementById('tuto').classList.add('hidden'); }
         socket.emit('login', me);
 
-        function addContact() {
-            const phone = document.getElementById('search').value;
-            socket.emit('request-contact', { targetPhone: phone, fromUser: me.user });
+        function add() { socket.emit('request-contact', { targetPhone: document.getElementById('sch').value, fromUser: me.user }); alert("Sent"); }
+        socket.on('contact-invite', (d) => { if(confirm(d.from + " wants to add you?")) socket.emit('accept-contact', { to: d.from, from: me.user }); });
+        socket.on('load-my-contacts', (c) => { render(c); });
+        socket.on('contact-added', (u) => { location.reload(); });
+
+        function render(c) {
+            document.getElementById('clist').innerHTML = c.map(u => `
+                <div onclick='openC(${JSON.stringify(u)})' class="p-4 bg-white/5 rounded-2xl flex items-center gap-3">
+                    <img src="${u.pfp}" class="w-8 h-8 rounded-full border border-white/10">
+                    <p class="font-bold text-xs">${u.user}</p>
+                </div>`).join('');
         }
 
-        socket.on('contact-invite', (data) => {
-            if(confirm(data.from + " wants to add you. Accept?")) {
-                socket.emit('accept-contact', { to: data.from, from: me.user });
-            }
-        });
-
-        socket.on('load-my-contacts', (contacts) => {
-            document.getElementById('contact-list').innerHTML = contacts.map(u => `
-                <div onclick='openChat(${JSON.stringify(u)})' class="p-4 bg-white/5 rounded-2xl cursor-pointer">
-                    <p class="font-bold text-sm">${u.user}</p>
-                </div>
-            `).join('');
-        });
-
-        function openChat(user) {
-            activeChat = user;
-            document.getElementById('active-name').innerText = user.user;
-            document.getElementById('messages').innerHTML = "";
-            socket.emit('load-history', { from: me.user, to: user.user });
-            if(window.innerWidth < 768) {
-                document.getElementById('sidebar').classList.add('hidden');
-                document.getElementById('chat-window').classList.remove('hidden');
-                document.getElementById('chat-window').classList.add('flex');
-            }
+        function openC(u) {
+            active = u;
+            document.getElementById('aname').innerText = u.user;
+            document.getElementById('apfp').src = u.pfp;
+            document.getElementById('apfp').classList.remove('hidden');
+            document.getElementById('msgs').innerHTML = "";
+            socket.emit('load-history', { from: me.user, to: u.user });
+            if(window.innerWidth < 768) { document.getElementById('sidebar').classList.add('hidden'); document.getElementById('chat').classList.remove('hidden'); document.getElementById('chat').classList.add('flex'); }
         }
-
-        function goBack() {
-            document.getElementById('sidebar').classList.remove('hidden');
-            document.getElementById('chat-window').classList.add('hidden');
+        function back() { document.getElementById('sidebar').classList.remove('hidden'); document.getElementById('chat').classList.add('hidden'); }
+        function send() { 
+            const val = document.getElementById('in').value;
+            if(val && active) { socket.emit('send-private-msg', { to: active.user, from: me.user, text: val }); document.getElementById('in').value = ""; }
         }
-
-        function send() {
-            const text = document.getElementById('msg-input').value;
-            if(text && activeChat) {
-                socket.emit('send-private-msg', { to: activeChat.user, from: me.user, text });
-                document.getElementById('msg-input').value = "";
-            }
-        }
-
-        socket.on('chat-history', (history) => {
-            history.forEach(m => display(m.sender, m.text));
-        });
-
-        socket.on('receive-msg', (data) => {
-            if(activeChat && (data.from === activeChat.user || data.from === me.user)) display(data.from, data.text);
-        });
-
-        function display(from, text) {
-            const isMe = from === me.user;
+        socket.on('chat-history', (h) => h.forEach(m => disp(m.sender, m.text)));
+        socket.on('receive-msg', (d) => { if(active && (d.from === active.user || d.from === me.user)) disp(d.from, d.text); });
+        function disp(f, t) {
+            const isMe = f === me.user;
             const div = document.createElement('div');
             div.className = `flex ${isMe ? 'justify-end' : 'justify-start'}`;
-            div.innerHTML = `<div class="p-3 rounded-2xl ${isMe ? 'bg-white text-black' : 'bg-white/10'}">${text}</div>`;
-            document.getElementById('messages').appendChild(div);
-            document.getElementById('messages').scrollTop = 9999;
+            div.innerHTML = `<div class="p-3 rounded-2xl text-xs ${isMe ? 'bg-white text-black' : 'bg-white/10'}">${t}</div>`;
+            document.getElementById('msgs').appendChild(div);
+            document.getElementById('msgs').scrollTop = 9999;
         }
     </script>
 </body>
