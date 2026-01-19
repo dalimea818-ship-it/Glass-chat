@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    :root { --msg-color: #ffffff; --bg-custom: linear-gradient(-45deg, #0f172a, #1e1b4b); }
+    body { background: var(--bg-custom); height: 100vh; font-family: 'Inter', sans-serif; color: white; transition: 0.5s; }
+    .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1); }
+    .msg-mine { background: var(--msg-color) !important; color: black; }
+  </style>
+</head>
+<body class="flex items-center justify-center p-4">
+  <div class="glass w-full max-w-7xl h-[90vh] rounded-[3rem] flex overflow-hidden shadow-2xl">
+    
+    <div class="w-80 border-r border-white/5 flex flex-col bg-black/20">
+      <div class="p-6 flex items-center justify-between border-b border-white/5">
+        <img id="my-pfp" class="w-12 h-12 rounded-full border-2 border-white/20 object-cover">
+        <div class="flex gap-4 opacity-50">
+          <button onclick="toggleSettings()">⚙️</button>
+          <button onclick="location.href='/'">🚪</button>
+        </div>
+      </div>
+      <div class="p-4"><input placeholder="Add contact by ID..." id="add-id" class="w-full bg-white/5 p-3 rounded-xl text-xs outline-none"></div>
+      <div id="contact-list" class="flex-1 overflow-y-auto"></div>
+    </div>
+
+    <div id="main-chat" class="flex-1 flex flex-col relative">
+      <div class="p-6 border-b border-white/5 flex items-center justify-between bg-black/10">
+        <div class="flex items-center gap-4">
+          <div id="active-pfp" class="w-10 h-10 rounded-full bg-white/10"></div>
+          <h2 id="active-name" class="font-bold">Select a contact</h2>
+        </div>
+        <div class="flex gap-6 text-xl">
+          <button onclick="alert('Calling...')">📞</button>
+          <button onclick="alert('Starting Video...')">🎥</button>
+        </div>
+      </div>
+
+      <div id="messages" class="flex-1 overflow-y-auto p-8 space-y-4"></div>
+
+      <div class="p-6 bg-black/20 flex gap-4 items-center">
+        <label class="cursor-pointer text-2xl">📎<input type="file" class="hidden" id="chat-file"></label>
+        <input id="msg-input" placeholder="Type a message..." class="flex-1 bg-white/5 p-4 rounded-2xl outline-none border border-white/10">
+        <button onclick="send()" class="bg-white text-black px-8 py-3 rounded-2xl font-black">SEND</button>
+      </div>
+
+      <div id="settings" class="hidden absolute inset-0 glass z-50 p-12">
+        <button onclick="toggleSettings()" class="mb-8 font-bold">← BACK</button>
+        <h2 class="text-4xl font-black mb-8">Settings</h2>
+        <div class="space-y-6">
+          <div>
+            <p class="mb-2 opacity-50">Message Color</p>
+            <input type="color" onchange="document.documentElement.style.setProperty('--msg-color', this.value)" class="w-20 h-10 bg-transparent border-none">
+          </div>
+          <div>
+            <p class="mb-2 opacity-50">Chat Background</p>
+            <button onclick="document.getElementById('bg-up').click()" class="bg-white/10 p-4 rounded-xl">Upload Custom Wallpaper</button>
+            <input type="file" id="bg-up" class="hidden" onchange="changeBG(this)">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const socket = io();
+    const me = JSON.parse(localStorage.getItem('user'));
+    if(!me) location.href = '/';
+
+    document.getElementById('my-pfp').src = me.pfp;
+    socket.emit('login', me);
+
+    function toggleSettings() { document.getElementById('settings').classList.toggle('hidden'); }
+
+    function changeBG(input) {
+      const reader = new FileReader();
+      reader.onload = (e) => document.body.style.background = `url(${e.target.result}) center/cover`;
+      reader.readAsDataURL(input.files[0]);
+    }
+
+    socket.on('update-online', (list) => {
+      const cl = document.getElementById('contact-list');
+      cl.innerHTML = list.map(u => u.user === me.user ? '' : `
+        <div class="p-4 flex items-center gap-4 hover:bg-white/5 cursor-pointer border-b border-white/5">
+          <img src="${u.pfp}" class="w-12 h-12 rounded-full object-cover">
+          <div><p class="font-bold">${u.user}</p><p class="text-[10px] opacity-40">ID: ${u.vid}</p></div>
+        </div>
+      `).join('');
+    });
+
+    function send() {
+      const text = document.getElementById('msg-input').value;
+      if(text) {
+        socket.emit('send-msg', { user: me.user, text, pfp: me.pfp });
+        document.getElementById('msg-input').value = "";
+      }
+    }
+
+    socket.on('receive-msg', (msg) => {
+      const div = document.createElement('div');
+      const isMe = msg.user === me.user;
+      div.className = `flex ${isMe ? 'justify-end' : 'justify-start'}`;
+      div.innerHTML = `
+        <div class="max-w-md p-4 rounded-3xl ${isMe ? 'msg-mine shadow-lg' : 'bg-white/10'}">
+          <p class="text-[9px] font-bold opacity-30 mb-1">${msg.user}</p>
+          ${msg.text}
+        </div>`;
+      document.getElementById('messages').appendChild(div);
+      document.getElementById('messages').scrollTop = 99999;
+    });
+  </script>
+</body>
+</html>
