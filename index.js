@@ -6,18 +6,12 @@ const path = require('path');
 const fs = require('fs');
 const mongoose = require('mongoose');
 
-// 1. DATABASE CONNECTIONS
+// 1. DATABASE
 const MONGO_URI = "mongodb+srv://admin:44CE0VlDDcTosDn3@cluster800.mh0idmx.mongodb.net/?appName=Cluster800";
-
-mongoose.connect(MONGO_URI)
-    .then(() => console.log("✅ MongoDB Connected"))
-    .catch(err => console.error("❌ MongoDB Error:", err));
+mongoose.connect(MONGO_URI).then(() => console.log("✅ DB Connected")).catch(err => console.log(err));
 
 const Message = mongoose.model('Message', new mongoose.Schema({
-    room: String,
-    sender: String,
-    text: String,
-    timestamp: { type: Date, default: Date.now }
+    room: String, sender: String, text: String, timestamp: { type: Date, default: Date.now }
 }));
 
 // 2. PERSON STORAGE
@@ -42,8 +36,7 @@ app.post('/signup', (req, res) => {
 
 app.post('/login', (req, res) => {
     const match = users.find(u => u.user === req.body.user && u.pass === req.body.pass);
-    if (match) res.json(match);
-    else res.status(401).send("Invalid");
+    if (match) res.json(match); else res.status(401).send("Invalid");
 });
 
 // 3. SOCKET LOGIC
@@ -57,10 +50,21 @@ io.on('connection', (socket) => {
         socket.emit('load-my-contacts', myContacts);
     });
 
-    // NEW: Discovery Logic
     socket.on('get-online-users', () => {
-        const list = Object.values(onlineUsers).map(u => ({ user: u.user, pfp: u.pfp, phone: u.phone }));
+        const list = Object.values(onlineUsers)
+            .filter(u => u.user !== socket.username) // Filter out yourself
+            .map(u => ({ user: u.user, pfp: u.pfp, phone: u.phone }));
         socket.emit('online-list', list);
+    });
+
+    socket.on('start-call', (data) => {
+        const target = onlineUsers[data.to];
+        if (target) io.to(target.socketId).emit('incoming-call', { from: data.from, type: data.type, pfp: data.pfp });
+    });
+
+    socket.on('end-call', (data) => {
+        const target = onlineUsers[data.to];
+        if (target) io.to(target.socketId).emit('call-ended');
     });
 
     socket.on('request-contact', (data) => {
