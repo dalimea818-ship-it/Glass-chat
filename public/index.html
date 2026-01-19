@@ -4,14 +4,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background: #000; color: white; font-family: sans-serif; height: 100vh; display: flex; align-items: center; justify-content: center; }
+        body { background: #000; color: white; height: 100vh; display: flex; align-items: center; justify-content: center; }
         .glass { background: rgba(255,255,255,0.05); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
         .hidden { display: none; }
     </style>
 </head>
 <body>
-    <div class="glass p-10 rounded-[2.5rem] w-full max-w-sm text-center">
-        <h1 class="text-3xl font-black italic mb-8">Glass Pro</h1>
+    <div class="glass p-10 rounded-[3rem] w-full max-w-sm text-center">
+        <h1 class="text-3xl font-black italic mb-8 tracking-tighter">Glass Pro</h1>
         
         <div id="login-form">
             <input id="l-user" placeholder="Username" class="w-full p-4 bg-white/5 rounded-2xl mb-3 outline-none">
@@ -21,6 +21,11 @@
         </div>
 
         <div id="signup-form" class="hidden">
+            <div class="w-24 h-24 border-2 border-dashed border-white/20 rounded-full mx-auto mb-6 flex items-center justify-center cursor-pointer overflow-hidden relative" onclick="document.getElementById('pfp-input').click()">
+                <span id="plus">+</span>
+                <img id="prev" class="absolute inset-0 w-full h-full object-cover hidden">
+            </div>
+            <input type="file" id="pfp-input" class="hidden" accept="image/*" onchange="preview(this)">
             <input id="s-user" placeholder="Username" class="w-full p-4 bg-white/5 rounded-2xl mb-3 outline-none">
             <input id="s-phone" placeholder="Phone Number" class="w-full p-4 bg-white/5 rounded-2xl mb-3 outline-none">
             <input id="s-pass" type="password" placeholder="Password" class="w-full p-4 bg-white/5 rounded-2xl mb-6 outline-none">
@@ -30,24 +35,26 @@
     </div>
 
     <script>
+        let pfpData = "";
         function toggle() { document.getElementById('login-form').classList.toggle('hidden'); document.getElementById('signup-form').classList.toggle('hidden'); }
-        
+        function preview(input) {
+            const reader = new FileReader();
+            reader.onload = (e) => { 
+                pfpData = e.target.result; 
+                document.getElementById('prev').src = pfpData; 
+                document.getElementById('prev').classList.remove('hidden'); 
+                document.getElementById('plus').classList.add('hidden');
+            };
+            reader.readAsDataURL(input.files[0]);
+        }
         async function signup() {
-            const user = document.getElementById('s-user').value;
-            const phone = document.getElementById('s-phone').value;
-            const pass = document.getElementById('s-pass').value;
-            const res = await fetch('/signup', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({user, phone, pass, pfp: ""}) });
+            const body = { user: document.getElementById('s-user').value, phone: document.getElementById('s-phone').value, pass: document.getElementById('s-pass').value, pfp: pfpData };
+            const res = await fetch('/signup', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
             if(res.ok) toggle();
         }
-
         async function login() {
-            const user = document.getElementById('l-user').value;
-            const pass = document.getElementById('l-pass').value;
-            const res = await fetch('/login', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({user, pass}) });
-            if(res.ok) {
-                localStorage.setItem('user', JSON.stringify(await res.json()));
-                window.location.href = "/chat";
-            }
+            const res = await fetch('/login', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({user: document.getElementById('l-user').value, pass: document.getElementById('l-pass').value}) });
+            if(res.ok) { localStorage.setItem('user', JSON.stringify(await res.json())); window.location.href = "/chat"; }
         }
     </script>
 </body>
