@@ -4,57 +4,98 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background: #000; color: white; height: 100vh; display: flex; align-items: center; justify-content: center; }
-        .glass { background: rgba(255,255,255,0.05); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
+        body { background: #000; color: white; height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        .glass { background: rgba(255,255,255,0.05); backdrop-filter: blur(15px); border: 1px solid rgba(255,255,255,0.1); }
         .hidden { display: none; }
+        input { transition: all 0.2s; }
+        input:focus { background: rgba(255,255,255,0.1); }
     </style>
 </head>
 <body>
-    <div class="glass p-10 rounded-[3rem] w-full max-w-sm text-center">
+    <div class="glass p-10 rounded-[3rem] w-full max-w-sm text-center shadow-2xl">
         <h1 class="text-3xl font-black italic mb-8 tracking-tighter">Glass Pro</h1>
         
-        <div id="login-form">
-            <input id="l-user" placeholder="Username" class="w-full p-4 bg-white/5 rounded-2xl mb-3 outline-none">
-            <input id="l-pass" type="password" placeholder="Password" class="w-full p-4 bg-white/5 rounded-2xl mb-6 outline-none">
-            <button onclick="login()" class="w-full py-4 bg-white text-black rounded-2xl font-bold">LOGIN</button>
-            <p onclick="toggle()" class="mt-6 text-xs opacity-40 cursor-pointer">Create Account</p>
+        <div id="login-section">
+            <input id="l-user" placeholder="Username" class="w-full p-4 bg-white/5 rounded-2xl mb-3 outline-none border border-white/5">
+            <input id="l-pass" type="password" placeholder="Password" class="w-full p-4 bg-white/5 rounded-2xl mb-6 outline-none border border-white/5">
+            <button id="btn-login" onclick="handleLogin()" class="w-full py-4 bg-white text-black rounded-2xl font-bold hover:scale-[1.02] active:scale-95 transition">LOGIN</button>
+            <p onclick="toggleView()" class="mt-6 text-xs opacity-40 cursor-pointer hover:opacity-100 uppercase tracking-widest">Create Account</p>
         </div>
 
-        <div id="signup-form" class="hidden">
-            <div class="w-24 h-24 border-2 border-dashed border-white/20 rounded-full mx-auto mb-6 flex items-center justify-center cursor-pointer overflow-hidden relative" onclick="document.getElementById('pfp-input').click()">
-                <span id="plus">+</span>
-                <img id="prev" class="absolute inset-0 w-full h-full object-cover hidden">
+        <div id="signup-section" class="hidden">
+            <div class="w-20 h-20 border-2 border-dashed border-white/20 rounded-full mx-auto mb-6 flex items-center justify-center cursor-pointer overflow-hidden relative" onclick="document.getElementById('pfp-input').click()">
+                <span id="plus-text" class="text-xl opacity-40">+</span>
+                <img id="pfp-preview" class="absolute inset-0 w-full h-full object-cover hidden">
             </div>
-            <input type="file" id="pfp-input" class="hidden" accept="image/*" onchange="preview(this)">
-            <input id="s-user" placeholder="Username" class="w-full p-4 bg-white/5 rounded-2xl mb-3 outline-none">
-            <input id="s-phone" placeholder="Phone Number" class="w-full p-4 bg-white/5 rounded-2xl mb-3 outline-none">
-            <input id="s-pass" type="password" placeholder="Password" class="w-full p-4 bg-white/5 rounded-2xl mb-6 outline-none">
-            <button onclick="signup()" class="w-full py-4 bg-blue-600 rounded-2xl font-bold">SIGN UP</button>
-            <p onclick="toggle()" class="mt-6 text-xs opacity-40 cursor-pointer">Back to Login</p>
+            <input type="file" id="pfp-input" class="hidden" accept="image/*" onchange="previewImage(this)">
+            
+            <input id="s-user" placeholder="Username" class="w-full p-4 bg-white/5 rounded-2xl mb-3 outline-none border border-white/5">
+            <input id="s-phone" placeholder="Phone Number" class="w-full p-4 bg-white/5 rounded-2xl mb-3 outline-none border border-white/5">
+            <input id="s-pass" type="password" placeholder="Password" class="w-full p-4 bg-white/5 rounded-2xl mb-6 outline-none border border-white/5">
+            
+            <button id="btn-signup" onclick="handleSignup()" class="w-full py-4 bg-blue-600 rounded-2xl font-bold hover:bg-blue-500 transition">SIGN UP</button>
+            <p onclick="toggleView()" class="mt-6 text-xs opacity-40 cursor-pointer hover:opacity-100 uppercase tracking-widest">Back to Login</p>
         </div>
     </div>
 
     <script>
-        let pfpData = "";
-        function toggle() { document.getElementById('login-form').classList.toggle('hidden'); document.getElementById('signup-form').classList.toggle('hidden'); }
-        function preview(input) {
+        let pfpBase64 = "";
+
+        function toggleView() {
+            document.getElementById('login-section').classList.toggle('hidden');
+            document.getElementById('signup-section').classList.toggle('hidden');
+        }
+
+        function previewImage(input) {
             const reader = new FileReader();
             reader.onload = (e) => { 
-                pfpData = e.target.result; 
-                document.getElementById('prev').src = pfpData; 
-                document.getElementById('prev').classList.remove('hidden'); 
-                document.getElementById('plus').classList.add('hidden');
+                pfpBase64 = e.target.result; 
+                const img = document.getElementById('pfp-preview');
+                img.src = pfpBase64; 
+                img.classList.remove('hidden'); 
+                document.getElementById('plus-text').classList.add('hidden');
             };
             reader.readAsDataURL(input.files[0]);
         }
-        async function signup() {
-            const body = { user: document.getElementById('s-user').value, phone: document.getElementById('s-phone').value, pass: document.getElementById('s-pass').value, pfp: pfpData };
-            const res = await fetch('/signup', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
-            if(res.ok) toggle();
+
+        async function handleSignup() {
+            const user = document.getElementById('s-user').value;
+            const phone = document.getElementById('s-phone').value;
+            const pass = document.getElementById('s-pass').value;
+
+            if(!user || !phone || !pass) return alert("Please fill in all fields");
+
+            const res = await fetch('/signup', { 
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify({ user, phone, pass, pfp: pfpBase64 }) 
+            });
+
+            if(res.ok) {
+                alert("Account Created! Please login.");
+                toggleView();
+            } else {
+                alert("Username or Phone already taken.");
+            }
         }
-        async function login() {
-            const res = await fetch('/login', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({user: document.getElementById('l-user').value, pass: document.getElementById('l-pass').value}) });
-            if(res.ok) { localStorage.setItem('user', JSON.stringify(await res.json())); window.location.href = "/chat"; }
+
+        async function handleLogin() {
+            const user = document.getElementById('l-user').value;
+            const pass = document.getElementById('l-pass').value;
+
+            const res = await fetch('/login', { 
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify({ user, pass }) 
+            });
+
+            if(res.ok) {
+                const data = await res.json();
+                localStorage.setItem('user', JSON.stringify(data));
+                window.location.href = "/chat";
+            } else {
+                alert("Invalid Login Credentials");
+            }
         }
     </script>
 </body>
