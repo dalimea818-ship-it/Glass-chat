@@ -7,7 +7,7 @@ const fs = require('fs');
 const mongoose = require('mongoose');
 
 // 1. DATABASE CONNECTIONS
-const MONGO_URI = "mongodb+srv://admin:44CE0VlDDcTosDn3@cluster800.mh0idmx.mongodb.net/?appName=Cluster800";
+const MONGO_URI = "mongodb+srv://admin:YOUR_PASSWORD@cluster800.mh0idmx.mongodb.net/?appName=Cluster800";
 
 mongoose.connect(MONGO_URI)
     .then(() => console.log("✅ MongoDB Connected"))
@@ -28,7 +28,6 @@ let users = JSON.parse(fs.readFileSync(dbPath, 'utf-8'));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json({ limit: '50mb' }));
 
-// 3. ROUTES (Fixes "Cannot GET" errors)
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 app.get('/chat', (req, res) => res.sendFile(path.join(__dirname, 'public', 'chat.html')));
 
@@ -47,7 +46,7 @@ app.post('/login', (req, res) => {
     else res.status(401).send("Invalid");
 });
 
-// 4. SOCKET LOGIC
+// 3. SOCKET LOGIC
 let onlineUsers = {};
 io.on('connection', (socket) => {
     socket.on('login', (data) => {
@@ -56,6 +55,12 @@ io.on('connection', (socket) => {
         const myData = users.find(u => u.user === data.user);
         const myContacts = users.filter(u => myData.contacts.includes(u.user));
         socket.emit('load-my-contacts', myContacts);
+    });
+
+    // NEW: Discovery Logic
+    socket.on('get-online-users', () => {
+        const list = Object.values(onlineUsers).map(u => ({ user: u.user, pfp: u.pfp, phone: u.phone }));
+        socket.emit('online-list', list);
     });
 
     socket.on('request-contact', (data) => {
