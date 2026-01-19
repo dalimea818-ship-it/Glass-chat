@@ -1,165 +1,52 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Glass Pro | Join</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @keyframes gradientBG {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
-        }
-        body { 
-            background: linear-gradient(-45deg, #000000, #1a1a1a, #0a0a0a, #222);
-            background-size: 400% 400%;
-            animation: gradientBG 15s ease infinite;
-            height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-family: -apple-system, system-ui, sans-serif;
-            color: white;
-            margin: 0;
-        }
-        .glass-card { 
-            background: rgba(255, 255, 255, 0.03); 
-            backdrop-filter: blur(20px); 
-            border: 1px solid rgba(255, 255, 255, 0.1); 
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-        }
-        .input-field {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            transition: all 0.3s ease;
-        }
-        .input-field:focus {
-            background: rgba(255, 255, 255, 0.1);
-            border-color: rgba(255, 255, 255, 0.3);
-            outline: none;
-        }
-        .pfp-preview {
-            width: 110px;
-            height: 110px;
-            border-radius: 50%;
-            border: 2px dashed rgba(255,255,255,0.2);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            overflow: hidden;
-            margin: 0 auto 1.5rem;
-            position: relative;
-        }
+        body { background: #000; color: white; font-family: sans-serif; height: 100vh; display: flex; align-items: center; justify-content: center; }
+        .glass { background: rgba(255,255,255,0.05); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
         .hidden { display: none; }
     </style>
 </head>
 <body>
-
-    <div class="glass-card p-10 rounded-[3rem] w-full max-w-sm text-center">
-        <h1 class="text-4xl font-black italic mb-2 tracking-tighter">Glass Pro</h1>
-        <p class="text-[10px] uppercase tracking-[0.3em] opacity-40 mb-10">Private Messenger</p>
-
-        <div id="login-section">
-            <div class="space-y-3">
-                <input id="l-user" type="text" placeholder="Username" class="input-field w-full p-4 rounded-2xl text-sm">
-                <input id="l-pass" type="password" placeholder="Password" class="input-field w-full p-4 rounded-2xl text-sm">
-            </div>
-            <button onclick="handleLogin()" class="w-full py-4 bg-white text-black rounded-2xl font-bold mt-8 hover:scale-[1.02] active:scale-95 transition">
-                SIGN IN
-            </button>
-            <p onclick="toggleView()" class="mt-8 text-[11px] opacity-40 cursor-pointer hover:opacity-100 transition uppercase tracking-widest">
-                Create an account
-            </p>
+    <div class="glass p-10 rounded-[2.5rem] w-full max-w-sm text-center">
+        <h1 class="text-3xl font-black italic mb-8">Glass Pro</h1>
+        
+        <div id="login-form">
+            <input id="l-user" placeholder="Username" class="w-full p-4 bg-white/5 rounded-2xl mb-3 outline-none">
+            <input id="l-pass" type="password" placeholder="Password" class="w-full p-4 bg-white/5 rounded-2xl mb-6 outline-none">
+            <button onclick="login()" class="w-full py-4 bg-white text-black rounded-2xl font-bold">LOGIN</button>
+            <p onclick="toggle()" class="mt-6 text-xs opacity-40 cursor-pointer">Create Account</p>
         </div>
 
-        <div id="signup-section" class="hidden">
-            <div class="pfp-preview" onclick="document.getElementById('pfp-input').click()">
-                <span id="pfp-plus" class="text-3xl opacity-50">+</span>
-                <img id="pfp-img" class="absolute inset-0 w-full h-h-full object-cover hidden">
-            </div>
-            <input type="file" id="pfp-input" class="hidden" accept="image/*" onchange="previewImage(this)">
-            
-            <div class="space-y-3">
-                <input id="s-user" type="text" placeholder="Choose Username" class="input-field w-full p-4 rounded-2xl text-sm">
-                <input id="s-phone" type="text" placeholder="Phone Number (for search)" class="input-field w-full p-4 rounded-2xl text-sm">
-                <input id="s-pass" type="password" placeholder="Create Password" class="input-field w-full p-4 rounded-2xl text-sm">
-            </div>
-            
-            <button onclick="handleSignup()" class="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold mt-8 hover:bg-blue-500 transition">
-                CREATE ACCOUNT
-            </button>
-            <p onclick="toggleView()" class="mt-8 text-[11px] opacity-40 cursor-pointer hover:opacity-100 transition uppercase tracking-widest">
-                Already have an account?
-            </p>
+        <div id="signup-form" class="hidden">
+            <input id="s-user" placeholder="Username" class="w-full p-4 bg-white/5 rounded-2xl mb-3 outline-none">
+            <input id="s-phone" placeholder="Phone Number" class="w-full p-4 bg-white/5 rounded-2xl mb-3 outline-none">
+            <input id="s-pass" type="password" placeholder="Password" class="w-full p-4 bg-white/5 rounded-2xl mb-6 outline-none">
+            <button onclick="signup()" class="w-full py-4 bg-blue-600 rounded-2xl font-bold">SIGN UP</button>
+            <p onclick="toggle()" class="mt-6 text-xs opacity-40 cursor-pointer">Back to Login</p>
         </div>
     </div>
 
     <script>
-        let base64PFP = "";
-
-        function toggleView() {
-            document.getElementById('login-section').classList.toggle('hidden');
-            document.getElementById('signup-section').classList.toggle('hidden');
-        }
-
-        function previewImage(input) {
-            if (input.files && input.files[0]) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    base64PFP = e.target.result;
-                    const img = document.getElementById('pfp-img');
-                    img.src = base64PFP;
-                    img.classList.remove('hidden');
-                    document.getElementById('pfp-plus').classList.add('hidden');
-                }
-                reader.readAsDataURL(input.files[0]);
-            }
-        }
-
-        async function handleSignup() {
+        function toggle() { document.getElementById('login-form').classList.toggle('hidden'); document.getElementById('signup-form').classList.toggle('hidden'); }
+        
+        async function signup() {
             const user = document.getElementById('s-user').value;
             const phone = document.getElementById('s-phone').value;
             const pass = document.getElementById('s-pass').value;
-
-            if(!user || !phone || !pass) return alert("Please fill all fields");
-
-            const response = await fetch('/signup', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    user, 
-                    phone, 
-                    pass, 
-                    pfp: base64PFP || "https://cdn-icons-png.flaticon.com/512/149/149071.png" 
-                })
-            });
-
-            if(response.ok) {
-                alert("Account created! You can now login.");
-                toggleView();
-            } else {
-                alert("Username or Phone already in use.");
-            }
+            const res = await fetch('/signup', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({user, phone, pass, pfp: ""}) });
+            if(res.ok) toggle();
         }
 
-        async function handleLogin() {
+        async function login() {
             const user = document.getElementById('l-user').value;
             const pass = document.getElementById('l-pass').value;
-
-            const response = await fetch('/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user, pass })
-            });
-
-            if(response.ok) {
-                const userData = await response.json();
-                localStorage.setItem('user', JSON.stringify(userData));
+            const res = await fetch('/login', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({user, pass}) });
+            if(res.ok) {
+                localStorage.setItem('user', JSON.stringify(await res.json()));
                 window.location.href = "/chat";
-            } else {
-                alert("Invalid username or password");
             }
         }
     </script>
