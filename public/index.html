@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @keyframes river { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
+    body { 
+      background: linear-gradient(-45deg, #000000, #1a1a1a); 
+      background-size: 400% 400%; animation: river 15s ease infinite;
+      height: 100vh; display: flex; align-items: center; justify-content: center; font-family: sans-serif; color: white; 
+    }
+    .glass { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1); }
+    .avatar-circle { 
+      width: 100px; height: 100px; border-radius: 50%; border: 2px dashed rgba(255,255,255,0.5); 
+      display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; cursor: pointer; overflow: hidden; position: relative;
+    }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div class="glass p-10 rounded-[3rem] w-full max-w-sm text-center shadow-2xl">
+    <h1 class="text-4xl font-black italic mb-8 tracking-tighter">Glass Pro</h1>
+    
+    <div id="login-form">
+      <input id="l-user" placeholder="Username" class="w-full p-4 mb-3 rounded-2xl bg-white/5 outline-none border border-white/10 text-white">
+      <input id="l-pass" type="password" placeholder="Password" class="w-full p-4 mb-6 rounded-2xl bg-white/5 outline-none border border-white/10 text-white">
+      <button onclick="login()" class="w-full py-4 bg-white text-black rounded-2xl font-bold hover:scale-105 transition">LOGIN</button>
+      <p onclick="toggle()" class="mt-6 text-[10px] opacity-40 cursor-pointer uppercase tracking-widest hover:text-white">Create New Account</p>
+    </div>
+
+    <div id="signup-form" class="hidden">
+      <div class="avatar-circle" onclick="document.getElementById('pfp-in').click()">
+        <span id="plus" class="text-4xl font-light text-white opacity-80">+</span>
+        <img id="prev" class="absolute w-full h-full object-cover hidden">
+      </div>
+      <input type="file" id="pfp-in" class="hidden" accept="image/*" onchange="preview(this)">
+      
+      <input id="s-user" placeholder="Username" class="w-full p-4 mb-3 rounded-2xl bg-white/5 outline-none border border-white/10 text-white">
+      <input id="s-pass" type="password" placeholder="Password" class="w-full p-4 mb-3 rounded-2xl bg-white/5 outline-none border border-white/10 text-white">
+      <input id="s-vid" placeholder="Virtual ID (e.g. 007)" class="w-full p-4 mb-6 rounded-2xl bg-white/5 outline-none border border-white/10 text-white">
+      <button onclick="signup()" class="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold">SIGN UP</button>
+      <p onclick="toggle()" class="mt-6 text-[10px] opacity-40 cursor-pointer uppercase tracking-widest">Back to Login</p>
+    </div>
+  </div>
+
+  <script>
+    let pfpData = "";
+    function toggle() { document.getElementById('login-form').classList.toggle('hidden'); document.getElementById('signup-form').classList.toggle('hidden'); }
+    
+    function preview(input) {
+      const r = new FileReader();
+      r.onload = (e) => { 
+        pfpData = e.target.result; 
+        document.getElementById('prev').src = pfpData;
+        document.getElementById('prev').classList.remove('hidden');
+        document.getElementById('plus').classList.add('hidden');
+      };
+      if(input.files[0]) r.readAsDataURL(input.files[0]);
+    }
+
+    async function signup() {
+      const user = document.getElementById('s-user').value;
+      const pass = document.getElementById('s-pass').value;
+      const vid = document.getElementById('s-vid').value;
+      if(!user || !pass) return alert("Missing info");
+      
+      const res = await fetch('/signup', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({user, pass, vid, pfp: pfpData || 'https://via.placeholder.com/150'})});
+      if(res.ok) { alert("Account Created!"); toggle(); } else { alert("User already exists!"); }
+    }
+
+    async function login() {
+      const user = document.getElementById('l-user').value;
+      const pass = document.getElementById('l-pass').value;
+      const res = await fetch('/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({user, pass})});
+      if(res.ok) {
+        const data = await res.json();
+        localStorage.setItem('user', JSON.stringify(data));
+        window.location.href = '/chat'; 
+      } else { alert("Wrong password or user not found"); }
+    }
+  </script>
+</body>
+</html>
