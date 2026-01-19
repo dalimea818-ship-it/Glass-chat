@@ -6,29 +6,33 @@
     <script src="/socket.io/socket.io.js"></script>
     <style>
         body { color: white; height: 100vh; overflow: hidden; background: #000; font-family: sans-serif; }
-        .glass { background: rgba(255,255,255,0.03); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); }
+        .glass { background: rgba(255,255,255,0.03); backdrop-filter: blur(25px); border: 1px solid rgba(255,255,255,0.1); }
         .hidden { display: none !important; }
-        img { background-color: black; object-fit: cover; }
+        #bg-video { position: fixed; right: 0; bottom: 0; min-width: 100%; min-height: 100%; z-index: -1; object-fit: cover; filter: brightness(0.4); }
+        .bg-img { position: fixed; inset: 0; z-index: -1; background-size: cover; background-position: center; filter: brightness(0.4); }
+        img { background: black; object-fit: cover; }
     </style>
 </head>
 <body class="flex items-center justify-center md:p-6">
+    <video id="bg-video" autoplay muted loop class="hidden"></video>
+    <div id="bg-img" class="bg-img hidden"></div>
 
     <div id="mode-gate" class="fixed inset-0 z-[700] bg-black flex items-center justify-center p-6 text-center">
         <div class="glass p-10 rounded-[3rem] w-full max-w-sm">
-            <h2 class="text-3xl font-black italic mb-6">Glass Pro</h2>
-            <button onclick="enter('contacts')" class="w-full py-5 bg-white/5 border border-white/10 rounded-3xl mb-4 font-bold">Contacts Chat</button>
-            <button onclick="enter('global')" class="w-full py-5 bg-blue-600/20 border border-blue-500/30 rounded-3xl font-bold">Global Chat</button>
+            <h2 class="text-3xl font-black italic mb-6 italic">Glass Pro</h2>
+            <button onclick="enter('contacts')" class="w-full py-5 bg-white/5 border border-white/10 rounded-3xl mb-4 font-bold">Contacts</button>
+            <button onclick="enter('global')" class="w-full py-5 bg-pink-600/20 border border-pink-500/30 rounded-3xl font-bold">Global</button>
         </div>
     </div>
 
     <div class="glass w-full max-w-6xl h-full md:h-[90vh] md:rounded-[3rem] flex overflow-hidden relative shadow-2xl">
         <div id="sidebar" class="w-full md:w-80 flex flex-col border-r border-white/5">
             <div class="p-6 flex justify-between items-center">
-                <div>
-                    <h1 id="mode-label" class="font-black italic text-xl">Glass</h1>
-                    <p id="sub-label" class="text-[8px] opacity-30 tracking-widest uppercase">Contacts</p>
+                <div><h1 id="mode-label" class="font-black italic text-xl">Glass</h1><p id="sub-label" class="text-[8px] opacity-30">CONTACTS</p></div>
+                <div class="flex gap-2">
+                    <button onclick="switchMode()" class="w-8 h-8 glass rounded-full flex items-center justify-center text-xs">⇄</button>
+                    <button onclick="toggleSet()" class="w-8 h-8 glass rounded-full flex items-center justify-center text-xs">⚙️</button>
                 </div>
-                <button onclick="switchMode()" class="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center border border-white/10">⇄</button>
             </div>
             <div id="clist" class="flex-1 overflow-y-auto px-2"></div>
         </div>
@@ -38,75 +42,69 @@
                 <div class="flex items-center gap-4">
                     <button onclick="back()" class="md:hidden">←</button>
                     <img id="apfp" class="w-10 h-10 rounded-full hidden border border-white/10">
-                    <h2 id="aname" class="font-bold text-sm">Select</h2>
+                    <h2 id="aname" class="font-bold text-sm">Select Chat</h2>
                 </div>
             </div>
             <div id="msgs" class="flex-1 overflow-y-auto p-6 space-y-4"></div>
-            <div class="p-4 flex gap-2">
+            <div class="p-4 flex gap-2 items-center">
+                <input type="file" id="f-in" class="hidden" onchange="uploadFile(this)">
+                <button onclick="document.getElementById('f-in').click()" class="text-xl opacity-40 hover:opacity-100">➕</button>
                 <input id="in" placeholder="Message..." class="flex-1 bg-white/5 p-4 rounded-3xl outline-none" onkeypress="if(event.key==='Enter')send()">
                 <button onclick="send()" class="bg-white text-black w-14 h-14 flex items-center justify-center rounded-full">➜</button>
             </div>
+        </div>
+
+        <div id="settings" class="hidden absolute inset-0 z-[800] glass flex flex-col p-10">
+            <div class="flex justify-between mb-10"><h2 class="text-3xl font-bold">Customization</h2><button onclick="toggleSet()">✕</button></div>
+            <p class="text-xs opacity-50 mb-4 uppercase">Upload Background (MP4, GIF, IMG)</p>
+            <input type="file" id="bg-input" class="hidden" onchange="setCustomBG(this)">
+            <button onclick="document.getElementById('bg-input').click()" class="w-full py-6 glass rounded-3xl font-bold mb-4">Upload Media</button>
+            <button onclick="localStorage.clear(); location.reload();" class="text-red-500 text-xs mt-auto">Logout</button>
         </div>
     </div>
 
     <script>
         const socket = io();
         const me = JSON.parse(localStorage.getItem('user'));
-        let active = null;
-        let currentMode = 'contacts';
+        let active = null, currentMode = 'contacts';
 
         if(!me) window.location.href = "/";
         socket.emit('login', me);
+        loadSavedBG();
 
-        function enter(m) {
-            currentMode = m;
-            document.getElementById('mode-gate').classList.add('hidden');
-            updateUI();
-        }
-
-        function switchMode() {
-            currentMode = (currentMode === 'contacts') ? 'global' : 'contacts';
-            updateUI();
-        }
-
-        function updateUI() {
-            document.getElementById('sub-label').innerText = currentMode;
+        function enter(m) { currentMode = m; document.getElementById('mode-gate').classList.add('hidden'); updateUI(); }
+        function switchMode() { currentMode = (currentMode === 'contacts') ? 'global' : 'contacts'; updateUI(); }
+        function updateUI() { 
+            document.getElementById('sub-label').innerText = currentMode; 
             document.getElementById('clist').innerHTML = "";
-            if(currentMode === 'global') socket.emit('get-online-users');
-            else socket.emit('login', me);
+            if(currentMode === 'global') socket.emit('get-online-users'); else socket.emit('login', me);
         }
 
-        function getP(url) { return (!url || url === "undefined" || url === "") ? 'data:image/gif;base64,R0lGODlhAQABAIAAAAUEBAAAACwAAAAAAQABAAACAkQBADs=' : url; }
+        function getP(u) { return (!u || u === "undefined") ? 'data:image/gif;base64,R0lGODlhAQABAIAAAAUEBAAAACwAAAAAAQABAAACAkQBADs=' : u; }
 
         function render(c, label) {
             const list = document.getElementById('clist');
             const isG = currentMode === 'global';
-            const html = c.map(u => `
-                <div onclick="initiate('${u.user}','${u.phone}',${isG},'${u.pfp}')" class="p-4 bg-white/5 rounded-2xl flex justify-between items-center mb-2 cursor-pointer">
-                    <div class="flex items-center gap-3">
-                        <img src="${getP(u.pfp)}" class="w-10 h-10 rounded-full border border-white/10">
+            list.innerHTML += `<p class="text-[9px] opacity-30 mt-4 mb-2 ml-2 uppercase">${label}</p>`;
+            c.forEach(u => {
+                const div = document.createElement('div');
+                div.className = "p-4 bg-white/5 rounded-2xl flex justify-between items-center mb-2 cursor-pointer";
+                div.innerHTML = `
+                    <div class="flex items-center gap-3" onclick="openC(${JSON.stringify(u)})">
+                        <img src="${getP(u.pfp)}" class="w-10 h-10 rounded-full">
                         <p class="font-bold text-sm">${u.user}</p>
                     </div>
-                    ${isG ? '<span class="text-blue-400 text-[10px]">+CHAT</span>' : ''}
-                </div>`).join('');
-            list.innerHTML += `<p class="text-[9px] opacity-30 mt-4 mb-2 ml-2 uppercase">${label}</p>` + html;
+                    ${isG ? `<button onclick="addFriend('${u.phone}','${u.user}')" class="text-pink-500 text-xl">♥</button>` : ''}
+                `;
+                list.appendChild(div);
+            });
         }
 
-        function initiate(name, phone, isG, pfp) {
-            if(isG) { if(confirm(`Chat with ${name}?`)) socket.emit('request-contact', { targetPhone: phone, fromUser: me.user }); }
-            else { openC({user: name, pfp: pfp}); }
-        }
-
-        socket.on('contact-invite', (d) => { if(confirm(d.from + " wants to chat. Accept?")) socket.emit('accept-contact', { to: d.from, from: me.user }); });
-
-        socket.on('contact-added', (newFriend) => {
-            currentMode = 'contacts';
-            updateUI();
-            setTimeout(() => openC(newFriend), 500); // Auto-open the chat
-        });
-
-        socket.on('load-my-contacts', (c) => { if(currentMode === 'contacts') render(c, 'FRIENDS'); });
-        socket.on('online-list', (c) => { if(currentMode === 'global') render(c, 'ONLINE'); });
+        function addFriend(p, n) { if(confirm(`Add ${n} to contacts?`)) socket.emit('request-contact', { targetPhone: p, fromUser: me.user }); }
+        socket.on('contact-invite', (d) => { if(confirm(d.from + " wants to be contacts. Accept?")) socket.emit('accept-contact', { to: d.from, from: me.user }); });
+        socket.on('contact-added', (n) => { updateUI(); setTimeout(() => openC(n), 500); });
+        socket.on('load-my-contacts', (c) => { if(currentMode === 'contacts') render(c, 'Contacts'); });
+        socket.on('online-list', (c) => { if(currentMode === 'global') render(c, 'Global Online'); });
 
         function openC(u) {
             active = u;
@@ -115,24 +113,63 @@
             document.getElementById('apfp').classList.remove('hidden');
             document.getElementById('msgs').innerHTML = "";
             socket.emit('load-history', { from: me.user, to: u.user });
-            if(window.innerWidth < 768) { document.getElementById('sidebar').classList.add('hidden'); document.getElementById('chat').classList.remove('hidden'); document.getElementById('chat').classList.add('flex'); }
+            if(window.innerWidth < 768) { document.getElementById('sidebar').classList.add('hidden'); document.getElementById('chat').classList.remove('hidden').add('flex'); }
+        }
+
+        // FILE UPLOADS
+        function uploadFile(input) {
+            const file = input.files[0];
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                let type = 'file';
+                if(file.type.startsWith('image/')) type = 'img';
+                else if(file.type.startsWith('video/')) type = 'vid';
+                socket.emit('send-private-msg', { to: active.user, from: me.user, text: e.target.result, fileType: type, fileName: file.name });
+            };
+            reader.readAsDataURL(file);
         }
 
         function send() {
             const v = document.getElementById('in').value;
-            if(v && active) { socket.emit('send-private-msg', { to: active.user, from: me.user, text: v }); document.getElementById('in').value = ""; }
+            if(v && active) { socket.emit('send-private-msg', { to: active.user, from: me.user, text: v, fileType: 'text' }); document.getElementById('in').value = ""; }
         }
 
-        socket.on('chat-history', (h) => h.forEach(m => disp(m.sender, m.text)));
-        socket.on('receive-msg', (d) => { if(active && (d.from === active.user || d.from === me.user)) disp(d.from, d.text); });
-        
-        function disp(f, t) {
-            const isMe = f === me.user;
+        socket.on('receive-msg', (d) => { if(active && (d.from === active.user || d.from === me.user)) disp(d); });
+        function disp(d) {
+            const isMe = d.from === me.user;
             const div = document.createElement('div');
-            div.className = `flex ${isMe ? 'justify-end' : 'justify-start'}`;
-            div.innerHTML = `<div class="p-3 px-5 rounded-[1.5rem] text-sm ${isMe ? 'bg-white text-black' : 'bg-white/10'}">${t}</div>`;
+            div.className = `flex ${isMe ? 'justify-end' : 'justify-start'} mb-2`;
+            let content = `<p class="text-sm">${d.text}</p>`;
+            if(d.fileType === 'img') content = `<img src="${d.text}" class="max-w-[200px] rounded-xl">`;
+            else if(d.fileType === 'vid') content = `<video src="${d.text}" controls class="max-w-[200px] rounded-xl">`;
+            else if(d.fileType === 'file') content = `<a href="${d.text}" download="${d.fileName}" class="text-xs font-bold">📂 ${d.fileName}</a>`;
+            
+            div.innerHTML = `<div class="p-3 px-5 rounded-[1.5rem] ${isMe ? 'bg-white text-black' : 'bg-white/10'}">${content}</div>`;
             document.getElementById('msgs').appendChild(div);
             document.getElementById('msgs').scrollTop = 9999;
+        }
+
+        // CUSTOMIZATION
+        function toggleSet() { document.getElementById('settings').classList.toggle('hidden'); }
+        function setCustomBG(input) {
+            const file = input.files[0];
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                localStorage.setItem('bg-data', e.target.result);
+                localStorage.setItem('bg-type', file.type);
+                loadSavedBG();
+            };
+            reader.readAsDataURL(file);
+        }
+        function loadSavedBG() {
+            const data = localStorage.getItem('bg-data'), type = localStorage.getItem('bg-type');
+            const vid = document.getElementById('bg-video'), img = document.getElementById('bg-img');
+            if(!data) return;
+            if(type.includes('video') || type.includes('mp4')) {
+                vid.src = data; vid.classList.remove('hidden'); img.classList.add('hidden');
+            } else {
+                img.style.backgroundImage = `url(${data})`; img.classList.remove('hidden'); vid.classList.add('hidden');
+            }
         }
         function back() { document.getElementById('sidebar').classList.remove('hidden'); document.getElementById('chat').classList.add('hidden'); }
     </script>
