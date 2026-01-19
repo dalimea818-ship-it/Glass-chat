@@ -5,74 +5,64 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="/socket.io/socket.io.js"></script>
     <style>
-        :root { --msg-color: #ffffff; }
-        body { color: white; height: 100vh; overflow: hidden; transition: background 0.5s ease; background: #000; }
+        body { color: white; height: 100vh; overflow: hidden; background: #000; transition: background 0.5s; }
         .glass { background: rgba(255,255,255,0.03); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); }
         .hidden { display: none !important; }
-
-        /* ANIMATED BACKGROUNDS */
-        @keyframes gradientMove { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
-        body.river { background: linear-gradient(-45deg, #001f3f, #0074D9, #001f3f); background-size: 300% 300%; animation: gradientMove 10s ease infinite; }
-        body.aurora { background: linear-gradient(-45deg, #0f2027, #2c5364, #203a43); background-size: 300% 300%; animation: gradientMove 8s ease infinite; }
-        body.sunset { background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5); background-size: 300% 300%; animation: gradientMove 12s ease infinite; }
+        @keyframes gradient { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+        body.river { background: linear-gradient(-45deg, #001f3f, #0074D9, #001f3f); background-size: 300% 300%; animation: gradient 10s ease infinite; }
         body.custom-bg { background-size: cover !important; background-position: center !important; }
     </style>
 </head>
 <body class="flex items-center justify-center md:p-6">
 
-    <div id="tuto-box" class="hidden fixed inset-0 z-[500] bg-black/80 flex items-center justify-center p-6 text-center">
-        <div class="glass p-10 rounded-[3rem] max-w-sm">
-            <div id="tuto-icon" class="text-5xl mb-4">🔍</div>
-            <h2 id="tuto-title" class="text-2xl font-black mb-2">Search</h2>
-            <p id="tuto-text" class="opacity-50 mb-8 text-sm">Enter a phone number to find friends.</p>
-            <button onclick="nextTuto()" class="w-full py-4 bg-white text-black rounded-2xl font-bold">NEXT</button>
+    <div id="call-screen" class="hidden fixed inset-0 z-[600] bg-black/90 backdrop-blur-xl flex flex-col items-center justify-center text-center">
+        <img id="call-pfp" class="w-32 h-32 rounded-full border-4 border-white/20 mb-6 object-cover shadow-2xl">
+        <h3 id="call-user" class="text-3xl font-black mb-2">User</h3>
+        <p id="call-status" class="opacity-50 text-sm uppercase mb-20">Ringing...</p>
+        <div class="flex gap-10">
+            <button onclick="rejectCall()" class="w-20 h-20 bg-red-500 rounded-full flex items-center justify-center text-2xl">✕</button>
+            <button id="accept-btn" onclick="acceptCall()" class="hidden w-20 h-20 bg-green-500 rounded-full flex items-center justify-center text-2xl">📞</button>
         </div>
     </div>
+    <audio id="ring" src="https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3" loop></audio>
+    <audio id="dial" src="https://assets.mixkit.co/active_storage/sfx/1358/1358-preview.mp3" loop></audio>
 
     <div class="glass w-full max-w-6xl h-full md:h-[90vh] md:rounded-[3rem] flex overflow-hidden relative shadow-2xl">
-        
         <div id="sidebar" class="w-full md:w-80 flex flex-col border-r border-white/5">
             <div class="p-6 flex justify-between items-center">
                 <h1 class="font-black italic text-xl">Glass</h1>
-                <button onclick="toggleSettings()" class="opacity-40 hover:opacity-100">⚙️</button>
+                <button onclick="toggleSet()" class="opacity-40">⚙️</button>
             </div>
-            
-            <div class="px-4 pb-4">
-                <div class="bg-white/5 rounded-2xl flex items-center px-4">
-                    <input id="sch" placeholder="Search phone..." class="w-full py-3 bg-transparent text-xs outline-none">
-                    <button onclick="add()" class="text-blue-400 font-bold text-[10px]">ADD</button>
-                </div>
-            </div>
-
-            <div id="clist" class="flex-1 overflow-y-auto px-2 space-y-1"></div>
+            <div id="clist" class="flex-1 overflow-y-auto px-2"></div>
         </div>
 
         <div id="chat" class="hidden md:flex flex-1 flex-col bg-white/[0.01]">
-            <div class="p-4 border-b border-white/5 flex items-center gap-4">
-                <button onclick="back()" class="md:hidden">←</button>
-                <img id="apfp" class="w-10 h-10 rounded-full border border-white/10 hidden">
-                <div class="flex-1"><h2 id="aname" class="font-bold text-sm">Welcome</h2></div>
+            <div class="p-4 border-b border-white/5 flex items-center justify-between">
+                <div class="flex items-center gap-4">
+                    <button onclick="back()" class="md:hidden">←</button>
+                    <img id="apfp" class="w-10 h-10 rounded-full hidden border border-white/10">
+                    <h2 id="aname" class="font-bold text-sm">Welcome</h2>
+                </div>
+                <div id="call-btns" class="hidden flex gap-5 mr-2">
+                    <button onclick="startCall('voice')" class="opacity-40 hover:opacity-100">📞</button>
+                    <button onclick="startCall('video')" class="opacity-40 hover:opacity-100">🎥</button>
+                </div>
             </div>
             <div id="msgs" class="flex-1 overflow-y-auto p-6 space-y-4"></div>
             <div class="p-4 flex gap-2">
                 <input id="in" placeholder="Message..." class="flex-1 bg-white/5 p-4 rounded-3xl outline-none" onkeypress="if(event.key==='Enter')send()">
-                <button onclick="send()" class="bg-white text-black w-14 h-14 flex items-center justify-center rounded-full font-bold">➜</button>
+                <button onclick="send()" class="bg-white text-black w-14 h-14 flex items-center justify-center rounded-full">➜</button>
             </div>
         </div>
 
         <div id="settings" class="hidden absolute inset-0 z-[400] glass flex flex-col p-10 overflow-y-auto">
-            <div class="flex justify-between items-center mb-10"><h2 class="text-4xl font-black italic">Settings</h2><button onclick="toggleSettings()" class="text-2xl">✕</button></div>
-            
-            <p class="text-[10px] uppercase tracking-widest opacity-40 mb-4">Live Backgrounds</p>
-            <div class="grid grid-cols-2 gap-4 mb-10">
-                <div onclick="setTheme('river')" class="h-20 rounded-2xl bg-blue-900 border border-white/10 cursor-pointer"></div>
-                <div onclick="setTheme('aurora')" class="h-20 rounded-2xl bg-emerald-900 border border-white/10 cursor-pointer"></div>
-                <div onclick="setTheme('sunset')" class="h-20 rounded-2xl bg-orange-900 border border-white/10 cursor-pointer"></div>
+            <div class="flex justify-between items-center mb-10"><h2 class="text-4xl font-black italic">Settings</h2><button onclick="toggleSet()" class="text-2xl">✕</button></div>
+            <div class="grid grid-cols-2 gap-4">
+                <div onclick="setT('river')" class="h-20 rounded-2xl bg-blue-900 cursor-pointer"></div>
                 <div onclick="document.getElementById('bgu').click()" class="h-20 rounded-2xl border-2 border-dashed border-white/20 flex items-center justify-center cursor-pointer">+ Photo</div>
             </div>
             <input type="file" id="bgu" class="hidden" accept="image/*" onchange="uploadBG(this)">
-            
-            <button onclick="logout()" class="w-full py-4 bg-red-500/10 text-red-500 rounded-2xl font-bold border border-red-500/20">LOGOUT</button>
+            <button onclick="logout()" class="w-full py-4 bg-red-500/10 text-red-500 rounded-2xl font-bold mt-10">LOGOUT</button>
         </div>
     </div>
 
@@ -80,50 +70,29 @@
         const socket = io();
         const me = JSON.parse(localStorage.getItem('user'));
         let active = null;
-        let tutoStep = 0;
 
         if(!me) window.location.href = "/";
         socket.emit('login', me);
-
-        // --- TUTORIAL LOGIC ---
-        const steps = [
-            { icon: "🔍", title: "Search", text: "Find anyone by their phone number." },
-            { icon: "🌐", title: "Global Online", text: "We've added everyone online to your list so you can start now!" },
-            { icon: "⚙️", title: "Style", text: "Customize your background in settings." }
-        ];
-
-        window.onload = () => {
-            if(!localStorage.getItem('tuto_done')) document.getElementById('tuto-box').classList.remove('hidden');
-            loadTheme();
-        };
-
-        function nextTuto() {
-            tutoStep++;
-            if(tutoStep < steps.length) {
-                document.getElementById('tuto-icon').innerText = steps[tutoStep].icon;
-                document.getElementById('tuto-title').innerText = steps[tutoStep].title;
-                document.getElementById('tuto-text').innerText = steps[tutoStep].text;
-            } else {
-                document.getElementById('tuto-box').classList.add('hidden');
-                localStorage.setItem('tuto_done', '1');
-                socket.emit('get-online-users'); // Populate global list
-            }
-        }
+        socket.emit('get-online-users');
 
         // --- CORE FUNCTIONS ---
-        function add() { socket.emit('request-contact', { targetPhone: document.getElementById('sch').value, fromUser: me.user }); }
+        function addReq(phone) { socket.emit('request-contact', { targetPhone: phone, fromUser: me.user }); alert("Request Sent!"); }
         socket.on('contact-invite', (d) => { if(confirm(d.from+" wants to add you?")) socket.emit('accept-contact', { to: d.from, from: me.user }); });
         socket.on('contact-added', () => location.reload());
-        
-        socket.on('load-my-contacts', (c) => render(c, 'MY FRIENDS'));
+
+        socket.on('load-my-contacts', (c) => render(c, 'FRIENDS'));
         socket.on('online-list', (c) => render(c, 'GLOBAL ONLINE'));
 
         function render(c, label) {
             const list = document.getElementById('clist');
+            const isGlobal = label === 'GLOBAL ONLINE';
             const html = c.map(u => `
-                <div onclick='openC(${JSON.stringify(u)})' class="p-4 bg-white/5 rounded-2xl flex items-center gap-3 mb-2 cursor-pointer">
-                    <img src="${u.pfp}" class="w-10 h-10 rounded-full border border-white/10 object-cover">
-                    <p class="font-bold text-sm">${u.user}</p>
+                <div onclick="${isGlobal ? `addReq('${u.phone}')` : `openC(${JSON.stringify(u)})`}" class="p-4 bg-white/5 rounded-2xl flex justify-between items-center mb-2 cursor-pointer">
+                    <div class="flex items-center gap-3">
+                        <img src="${u.pfp}" class="w-10 h-10 rounded-full object-cover">
+                        <p class="font-bold text-sm">${u.user}</p>
+                    </div>
+                    ${isGlobal ? '<span class="text-blue-400 text-[10px]">+ADD</span>' : ''}
                 </div>`).join('');
             list.innerHTML += `<p class="text-[9px] opacity-30 mt-4 mb-2 ml-2">${label}</p>` + html;
         }
@@ -133,23 +102,42 @@
             document.getElementById('aname').innerText = u.user;
             document.getElementById('apfp').src = u.pfp;
             document.getElementById('apfp').classList.remove('hidden');
+            document.getElementById('call-btns').classList.remove('hidden');
             document.getElementById('msgs').innerHTML = "";
             socket.emit('load-history', { from: me.user, to: u.user });
             if(window.innerWidth < 768) { document.getElementById('sidebar').classList.add('hidden'); document.getElementById('chat').classList.remove('hidden'); document.getElementById('chat').classList.add('flex'); }
         }
 
-        function back() { document.getElementById('sidebar').classList.remove('hidden'); document.getElementById('chat').classList.add('hidden'); }
-        function send() { 
-            const val = document.getElementById('in').value;
-            if(val && active) { 
-                socket.emit('send-private-msg', { to: active.user, from: me.user, text: val }); 
-                document.getElementById('in').value = ""; 
-            }
+        // --- CALL LOGIC ---
+        function startCall(t) {
+            document.getElementById('call-user').innerText = active.user;
+            document.getElementById('call-pfp').src = active.pfp;
+            document.getElementById('call-screen').classList.remove('hidden');
+            document.getElementById('dial').play();
+            socket.emit('start-call', { to: active.user, from: me.user, type: t, pfp: me.pfp });
         }
+        socket.on('incoming-call', (d) => {
+            active = { user: d.from, pfp: d.pfp };
+            document.getElementById('call-user').innerText = d.from;
+            document.getElementById('call-pfp').src = d.pfp;
+            document.getElementById('call-screen').classList.remove('hidden');
+            document.getElementById('accept-btn').classList.remove('hidden');
+            document.getElementById('ring').play();
+        });
+        function rejectCall() { 
+            document.getElementById('ring').pause(); document.getElementById('dial').pause();
+            document.getElementById('call-screen').classList.add('hidden');
+            socket.emit('end-call', { to: active.user });
+        }
+        socket.on('call-ended', () => { document.getElementById('ring').pause(); document.getElementById('dial').pause(); document.getElementById('call-screen').classList.add('hidden'); });
 
+        // --- MESSAGING ---
+        function send() {
+            const val = document.getElementById('in').value;
+            if(val && active) { socket.emit('send-private-msg', { to: active.user, from: me.user, text: val }); document.getElementById('in').value = ""; }
+        }
         socket.on('chat-history', (h) => h.forEach(m => disp(m.sender, m.text)));
         socket.on('receive-msg', (d) => { if(active && (d.from === active.user || d.from === me.user)) disp(d.from, d.text); });
-
         function disp(f, t) {
             const isMe = f === me.user;
             const div = document.createElement('div');
@@ -159,30 +147,14 @@
             document.getElementById('msgs').scrollTop = 9999;
         }
 
-        // --- THEME ENGINE ---
-        function toggleSettings() { document.getElementById('settings').classList.toggle('hidden'); }
-        function setTheme(t) {
-            document.body.className = t;
-            localStorage.setItem('theme', t);
-        }
-        function uploadBG(input) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                document.body.className = 'custom-bg';
-                document.body.style.backgroundImage = `url(${e.target.result})`;
-                localStorage.setItem('theme', 'custom-bg');
-                localStorage.setItem('custom-img', e.target.result);
-            };
-            reader.readAsDataURL(input.files[0]);
-        }
-        function loadTheme() {
-            const t = localStorage.getItem('theme');
-            if(t === 'custom-bg') {
-                document.body.className = t;
-                document.body.style.backgroundImage = `url(${localStorage.getItem('custom-img')})`;
-            } else if(t) {
-                document.body.className = t;
-            }
+        // --- MISC ---
+        function back() { document.getElementById('sidebar').classList.remove('hidden'); document.getElementById('chat').classList.add('hidden'); }
+        function toggleSet() { document.getElementById('settings').classList.toggle('hidden'); }
+        function setT(t) { document.body.className = t; localStorage.setItem('theme', t); }
+        function uploadBG(i) {
+            const r = new FileReader();
+            r.onload = (e) => { document.body.className = 'custom-bg'; document.body.style.backgroundImage = `url(${e.target.result})`; localStorage.setItem('theme', 'custom-bg'); localStorage.setItem('bg', e.target.result); };
+            r.readAsDataURL(i.files[0]);
         }
         function logout() { localStorage.clear(); window.location.href = "/"; }
     </script>
