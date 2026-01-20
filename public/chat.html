@@ -9,181 +9,169 @@
         .glass { background: rgba(255,255,255,0.03); backdrop-filter: blur(25px); border: 1px solid rgba(255,255,255,0.1); }
         .hidden { display: none !important; }
         #bg-video, .bg-img { position: fixed; inset: 0; z-index: -1; object-fit: cover; filter: brightness(0.3); width:100%; height:100%; }
-        img { background: black; object-fit: cover; }
         
-        /* Filters */
-        .f-sepia { filter: sepia(1) !important; }
-        .f-bw { filter: grayscale(1) !important; }
-        .f-invert { filter: invert(1) !important; }
+        /* Mobile Nav */
+        @media (min-width: 768px) { .mobile-nav { display: none; } }
+        .mobile-nav { 
+            position: fixed; bottom: 0; left: 0; right: 0; height: 80px; 
+            display: flex; justify-content: space-around; align-items: center;
+            background: rgba(0,0,0,0.8); backdrop-filter: blur(20px);
+            border-top: 1px solid rgba(255,255,255,0.1); z-index: 1000;
+            padding-bottom: 20px;
+        }
+        .tab-btn { flex: 1; display: flex; flex-direction: column; align-items: center; font-size: 10px; opacity: 0.4; transition: 0.3s; }
+        .tab-btn.active { opacity: 1; color: #fff; }
     </style>
 </head>
 <body class="flex items-center justify-center md:p-6">
     <video id="bg-video" autoplay muted loop class="hidden"></video>
     <div id="bg-img" class="bg-img hidden"></div>
 
-    <div id="call-screen" class="hidden fixed inset-0 z-[999] bg-black flex flex-col items-center justify-between py-10">
+    <div id="call-screen" class="hidden fixed inset-0 z-[2000] bg-black flex flex-col items-center justify-between py-20">
         <video id="remote-v" autoplay playsinline class="absolute inset-0 w-full h-full object-cover"></video>
-        <video id="local-v" autoplay playsinline muted class="absolute top-6 right-6 w-28 h-40 rounded-2xl border-2 border-white/20 object-cover"></video>
-        
+        <video id="local-v" autoplay playsinline muted class="absolute top-10 right-6 w-24 h-36 rounded-2xl border border-white/20 object-cover"></video>
         <div class="z-10 text-center">
-            <h2 id="call-status" class="text-xl font-bold tracking-widest uppercase opacity-60">Calling...</h2>
-            <h1 id="call-name" class="text-3xl font-black mt-2">User</h1>
+            <h1 id="call-name" class="text-3xl font-black">Virtual Call</h1>
+            <p id="call-status" class="opacity-50">Connecting...</p>
         </div>
-
-        <div class="z-10 flex gap-4 overflow-x-auto pb-4 px-6 w-full justify-center">
-            <button onclick="setFilter('none')" class="px-4 py-2 glass rounded-xl text-xs">Normal</button>
-            <button onclick="setFilter('f-sepia')" class="px-4 py-2 glass rounded-xl text-xs">Sepia</button>
-            <button onclick="setFilter('f-bw')" class="px-4 py-2 glass rounded-xl text-xs">B&W</button>
-        </div>
-
-        <div class="z-10 flex gap-6 items-center mb-6">
-            <button onclick="toggleTrack('audio')" id="btn-mic" class="w-14 h-14 glass rounded-full flex items-center justify-center">🎤</button>
-            <button onclick="endCall()" class="w-20 h-20 bg-red-600 rounded-full flex items-center justify-center text-2xl shadow-2xl">✕</button>
-            <button onclick="toggleTrack('video')" id="btn-vid" class="w-14 h-14 glass rounded-full flex items-center justify-center">🎥</button>
-            <button onclick="flipCam()" class="w-14 h-14 glass rounded-full flex items-center justify-center">🔄</button>
-        </div>
-
-        <div id="incoming-bar" class="hidden absolute inset-0 z-[1000] bg-black/90 flex flex-col items-center justify-center">
-            <h2 class="text-2xl font-bold mb-10">Incoming Call...</h2>
-            <div class="flex gap-10">
-                <button onclick="endCall()" class="w-20 h-20 bg-red-600 rounded-full">Decline</button>
-                <button onclick="answerCall()" class="w-20 h-20 bg-green-500 rounded-full">Answer</button>
-            </div>
+        <div class="z-10 flex gap-6">
+            <button onclick="toggleTrack('audio')" class="w-14 h-14 glass rounded-full">🎤</button>
+            <button onclick="endCall()" class="w-16 h-16 bg-red-600 rounded-full text-xl">✕</button>
+            <button onclick="toggleTrack('video')" class="w-14 h-14 glass rounded-full">🎥</button>
         </div>
     </div>
 
-    <div id="mode-gate" class="fixed inset-0 z-[700] bg-black flex items-center justify-center p-6">
-        <div class="glass p-10 rounded-[3rem] w-full max-w-sm text-center">
-            <h2 class="text-3xl font-black italic mb-6">Glass Pro</h2>
-            <button onclick="enter('contacts')" class="w-full py-5 bg-white/5 border border-white/10 rounded-3xl mb-4 font-bold">Friends</button>
-            <button onclick="enter('global')" class="w-full py-5 bg-blue-600/20 border border-blue-500/30 rounded-3xl font-bold">Global</button>
-        </div>
-    </div>
-
-    <div class="glass w-full max-w-6xl h-full md:h-[90vh] md:rounded-[3rem] flex overflow-hidden relative shadow-2xl">
+    <div class="glass w-full max-w-6xl h-full md:h-[90vh] md:rounded-[3rem] flex overflow-hidden relative">
+        
         <div id="sidebar" class="w-full md:w-80 flex flex-col border-r border-white/5">
             <div class="p-6 flex justify-between items-center">
-                <div><h1 class="font-black italic text-xl">Glass</h1><p id="sub-label" class="text-[8px] opacity-30">CONTACTS</p></div>
-                <div class="flex gap-2">
-                    <button onclick="switchMode()" class="w-8 h-8 glass rounded-full text-[10px]">⇄</button>
-                    <button onclick="toggleSet()" class="w-8 h-8 glass rounded-full text-[10px]">⚙️</button>
-                </div>
+                <h1 class="font-black italic text-xl">Glass</h1>
+                <button onclick="toggleSet()" class="text-xs opacity-50">SETTINGS</button>
             </div>
-            <div id="clist" class="flex-1 overflow-y-auto px-2 pb-20"></div>
+            <div id="clist" class="flex-1 overflow-y-auto px-2 pb-24"></div>
         </div>
 
-        <div id="chat" class="hidden md:flex flex-1 flex-col bg-white/[0.01]">
+        <div id="tab-calls" class="hidden w-full flex flex-col p-6 overflow-y-auto pb-32">
+            <h2 class="text-2xl font-black mb-6">Dialer</h2>
+            <div class="glass p-8 rounded-[2rem] text-center mb-6">
+                <input id="dial-num" placeholder="000000" class="w-full bg-transparent text-4xl font-mono mb-8 outline-none text-center">
+                <div class="grid grid-cols-3 gap-4">
+                    <button onclick="press('1')" class="h-14 glass rounded-2xl">1</button>
+                    <button onclick="press('2')" class="h-14 glass rounded-2xl">2</button>
+                    <button onclick="press('3')" class="h-14 glass rounded-2xl">3</button>
+                    <button onclick="press('4')" class="h-14 glass rounded-2xl">4</button>
+                    <button onclick="press('5')" class="h-14 glass rounded-2xl">5</button>
+                    <button onclick="press('6')" class="h-14 glass rounded-2xl">6</button>
+                    <button onclick="press('7')" class="h-14 glass rounded-2xl">7</button>
+                    <button onclick="press('8')" class="h-14 glass rounded-2xl">8</button>
+                    <button onclick="press('9')" class="h-14 glass rounded-2xl">9</button>
+                    <button onclick="document.getElementById('dial-num').value=''" class="h-14 text-red-500">C</button>
+                    <button onclick="press('0')" class="h-14 glass rounded-2xl">0</button>
+                    <button onclick="makeVirtualCall()" class="h-14 bg-green-600 rounded-2xl">📞</button>
+                </div>
+            </div>
+            <div id="call-history" class="space-y-2"></div>
+        </div>
+
+        <div id="chat-box" class="hidden md:flex flex-1 flex-col bg-white/[0.01]">
             <div class="p-4 border-b border-white/5 flex items-center justify-between">
-                <div class="flex items-center gap-4">
-                    <button onclick="back()" class="md:hidden">←</button>
-                    <img id="apfp" class="w-10 h-10 rounded-full hidden">
-                    <h2 id="aname" class="font-bold text-sm">Select</h2>
+                <button onclick="closeChat()" class="md:hidden">←</button>
+                <div class="flex items-center gap-3">
+                    <img id="apfp" class="w-10 h-10 rounded-full border border-white/10">
+                    <span id="aname" class="font-bold">Chat</span>
                 </div>
-                <div id="call-btns" class="hidden flex gap-4 mr-2">
-                    <button onclick="startCall('video')" class="text-xs font-bold opacity-60">🎥 HD CALL</button>
-                </div>
+                <button onclick="startCall()" class="px-4 py-2 glass rounded-full text-[10px] font-bold">🎥 CALL</button>
             </div>
             <div id="msgs" class="flex-1 overflow-y-auto p-6 space-y-4"></div>
-            <div class="p-4 flex gap-2 items-center">
-                <input type="file" id="f-in" class="hidden" onchange="uploadFile(this)">
-                <button onclick="document.getElementById('f-in').click()" class="opacity-40">➕</button>
-                <input id="in" placeholder="Message..." class="flex-1 bg-white/5 p-4 rounded-3xl outline-none" onkeypress="if(event.key==='Enter')send()">
-                <button onclick="send()" class="bg-white text-black w-14 h-14 flex items-center justify-center rounded-full">➜</button>
+            <div class="p-4 flex gap-2">
+                <input id="msg-in" placeholder="Message..." class="flex-1 bg-white/5 p-4 rounded-3xl outline-none" onkeypress="if(event.key==='Enter')sendMsg()">
+                <button onclick="sendMsg()" class="bg-white text-black w-12 h-12 rounded-full font-bold">➜</button>
             </div>
         </div>
+    </div>
 
-        <div id="settings" class="hidden absolute inset-0 z-[800] glass flex flex-col p-10">
-            <h2 class="text-3xl font-bold mb-10">Settings</h2>
-            <input type="file" id="bg-in" class="hidden" onchange="setBG(this)">
-            <button onclick="document.getElementById('bg-in').click()" class="w-full py-6 glass rounded-3xl font-bold">Custom BG (Video/GIF)</button>
-            <button onclick="localStorage.clear(); location.reload();" class="mt-auto text-red-500 text-xs">Logout</button>
-        </div>
+    <div class="mobile-nav">
+        <div onclick="setTab('chats')" class="tab-btn active" id="btn-chats"><span>💬</span>Chats</div>
+        <div onclick="setTab('global')" class="tab-btn" id="btn-global"><span>🌍</span>Global</div>
+        <div onclick="setTab('calls')" class="tab-btn" id="btn-calls"><span>📞</span>Calls</div>
     </div>
 
     <script>
         const socket = io();
         const me = JSON.parse(localStorage.getItem('user'));
-        let active = null, currentMode = 'contacts', peer, localStream, frontCam = true;
-        const config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+        let active = null, currentMode = 'contacts', peer, localStream;
 
         if(!me) window.location.href = "/";
         socket.emit('login', me);
-        loadBG();
 
-        function enter(m) { currentMode = m; document.getElementById('mode-gate').classList.add('hidden'); updateUI(); }
-        function switchMode() { currentMode = (currentMode === 'contacts') ? 'global' : 'contacts'; updateUI(); }
-        function updateUI() { 
-            document.getElementById('sub-label').innerText = currentMode.toUpperCase();
-            document.getElementById('clist').innerHTML = "";
-            if(currentMode === 'global') socket.emit('get-online-users'); else socket.emit('login', me);
+        function setTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('btn-'+tab).classList.add('active');
+            
+            document.getElementById('sidebar').classList.add('hidden');
+            document.getElementById('tab-calls').classList.add('hidden');
+            document.getElementById('chat-box').classList.add('hidden');
+
+            if(tab === 'chats') {
+                currentMode = 'contacts';
+                document.getElementById('sidebar').classList.remove('hidden');
+                updateList();
+            } else if(tab === 'global') {
+                currentMode = 'global';
+                document.getElementById('sidebar').classList.remove('hidden');
+                updateList();
+            } else {
+                document.getElementById('tab-calls').classList.remove('hidden');
+                socket.emit('get-calls', me.user);
+            }
         }
 
-        function getP(u) { return (!u || u === "undefined") ? 'data:image/gif;base64,R0lGODlhAQABAIAAAAUEBAAAACwAAAAAAQABAAACAkQBADs=' : u; }
+        function updateList() {
+            document.getElementById('clist').innerHTML = "";
+            if(currentMode === 'global') socket.emit('get-online-users');
+            else socket.emit('login', me);
+        }
 
-        function render(c, label) {
-            const list = document.getElementById('clist');
-            const isG = currentMode === 'global';
-            list.innerHTML += `<p class="text-[9px] opacity-30 mt-6 mb-2 ml-2 uppercase font-black">${label}</p>`;
-            c.forEach(u => {
-                const div = document.createElement('div');
-                div.className = "p-4 glass rounded-2xl flex justify-between items-center mb-2 cursor-pointer border-none";
-                div.innerHTML = `
-                    <div class="flex items-center gap-3" onclick="openC(${JSON.stringify(u)})">
-                        <img src="${getP(u.pfp)}" class="w-10 h-10 rounded-full">
+        socket.on('online-list', list => render(list, 'GLOBAL'));
+        socket.on('load-my-contacts', list => render(list, 'CONTACTS'));
+
+        function render(list, label) {
+            const container = document.getElementById('clist');
+            container.innerHTML += `<p class="text-[9px] opacity-30 mt-4 mb-2 ml-4">${label}</p>`;
+            list.forEach(u => {
+                const d = document.createElement('div');
+                d.className = "p-4 glass rounded-2xl flex justify-between items-center mb-2 mx-2 cursor-pointer";
+                d.innerHTML = `
+                    <div class="flex items-center gap-3" onclick="openChat(${JSON.stringify(u)})">
+                        <img src="${u.pfp || 'data:image/gif;base64,R0lGODlhAQABAIAAAAUEBAAAACwAAAAAAQABAAACAkQBADs='}" class="w-10 h-10 rounded-full">
                         <p class="font-bold text-sm">${u.user}</p>
                     </div>
-                    ${isG ? `<button onclick="addFriend('${u.phone}','${u.user}')" class="text-pink-500 text-lg">♥</button>` : ''}
+                    ${currentMode==='global' ? `<button onclick="addFriend('${u.phone}','${u.user}')" class="text-pink-500">♥</button>` : ''}
                 `;
-                list.appendChild(div);
+                container.appendChild(d);
             });
         }
 
-        function addFriend(p, n) { if(confirm(`Add ${n} to contacts?`)) socket.emit('request-contact', { targetPhone: p, fromUser: me.user }); }
-        socket.on('contact-invite', d => { if(confirm(`${d.from} wants to add you. Accept?`)) socket.emit('accept-contact', { to: d.from, from: me.user }); });
-        socket.on('contact-added', n => { updateUI(); setTimeout(() => openC(n), 500); });
-        socket.on('load-my-contacts', c => { if(currentMode === 'contacts') render(c, 'Contacts'); });
-        socket.on('online-list', c => { if(currentMode === 'global') render(c, 'Global Users'); });
-
-        function openC(u) {
+        function openChat(u) {
             active = u;
             document.getElementById('aname').innerText = u.user;
-            document.getElementById('apfp').src = getP(u.pfp);
-            document.getElementById('apfp').classList.remove('hidden');
-            document.getElementById('call-btns').classList.remove('hidden');
+            document.getElementById('apfp').src = u.pfp || '';
+            document.getElementById('chat-box').classList.remove('hidden');
+            document.getElementById('chat-box').classList.add('flex');
+            document.getElementById('sidebar').classList.add('hidden');
             document.getElementById('msgs').innerHTML = "";
             socket.emit('load-history', { from: me.user, to: u.user });
-            if(window.innerWidth < 768) { document.getElementById('sidebar').classList.add('hidden'); document.getElementById('chat').classList.remove('hidden').add('flex'); }
         }
 
-        // MESSAGING & FILES
-        function uploadFile(input) {
-            const f = input.files[0];
-            const reader = new FileReader();
-            reader.onload = e => {
-                let t = f.type.startsWith('image/') ? 'img' : (f.type.startsWith('video/') ? 'vid' : 'file');
-                socket.emit('send-private-msg', { to: active.user, from: me.user, text: e.target.result, fileType: t, fileName: f.name });
-            };
-            reader.readAsDataURL(f);
-        }
-        function send() {
-            const v = document.getElementById('in').value;
-            if(v && active) { socket.emit('send-private-msg', { to: active.user, from: me.user, text: v, fileType: 'text' }); document.getElementById('in').value = ""; }
-        }
-        socket.on('receive-msg', d => { if(active && (d.from === active.user || d.from === me.user)) disp(d); });
-        function disp(d) {
-            const isMe = d.from === me.user;
-            const div = document.createElement('div');
-            div.className = `flex ${isMe ? 'justify-end' : 'justify-start'} mb-2`;
-            let c = `<p class="text-sm">${d.text}</p>`;
-            if(d.fileType === 'img') c = `<img src="${d.text}" class="max-w-[200px] rounded-xl">`;
-            else if(d.fileType === 'vid') c = `<video src="${d.text}" controls class="max-w-[200px] rounded-xl">`;
-            else if(d.fileType === 'file') c = `<a href="${d.text}" download="${d.fileName}" class="text-xs font-bold underline">📂 ${d.fileName}</a>`;
-            div.innerHTML = `<div class="p-3 px-5 rounded-[1.5rem] ${isMe ? 'bg-white text-black' : 'bg-white/10'}">${c}</div>`;
-            document.getElementById('msgs').appendChild(div);
-            document.getElementById('msgs').scrollTop = 9999;
+        function press(n) { document.getElementById('dial-num').value += n; }
+
+        async function makeVirtualCall() {
+            const num = document.getElementById('dial-num').value;
+            if(!num) return;
+            active = { user: num, phone: num };
+            startCall();
         }
 
-        // PRO CALLING (WEBRTC)
         async function startCall() {
             document.getElementById('call-screen').classList.remove('hidden');
             document.getElementById('call-name').innerText = active.user;
@@ -191,27 +179,13 @@
             socket.emit('start-call', { to: active.user, from: me.user, pfp: me.pfp });
         }
 
-        socket.on('incoming-call', d => {
-            active = { user: d.from, pfp: d.pfp };
-            document.getElementById('call-screen').classList.remove('hidden');
-            document.getElementById('incoming-bar').classList.remove('hidden');
-            document.getElementById('call-name').innerText = d.from;
-        });
-
-        async function answerCall() {
-            document.getElementById('incoming-bar').classList.add('hidden');
-            await initRTC(false);
-        }
-
         async function initRTC(isCaller) {
-            peer = new RTCPeerConnection(config);
+            peer = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
             localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
             document.getElementById('local-v').srcObject = localStream;
             localStream.getTracks().forEach(t => peer.addTrack(t, localStream));
-
             peer.ontrack = e => document.getElementById('remote-v').srcObject = e.streams[0];
             peer.onicecandidate = e => { if(e.candidate) socket.emit('rtc-signal', { to: active.user, signal: e.candidate }); };
-
             if(isCaller) {
                 const offer = await peer.createOffer();
                 await peer.setLocalDescription(offer);
@@ -230,25 +204,6 @@
             else if(d.signal.candidate) await peer.addIceCandidate(new RTCIceCandidate(d.signal));
         });
 
-        function toggleTrack(type) {
-            const track = type === 'audio' ? localStream.getAudioTracks()[0] : localStream.getVideoTracks()[0];
-            track.enabled = !track.enabled;
-            document.getElementById(type === 'audio' ? 'btn-mic' : 'btn-vid').style.opacity = track.enabled ? '1' : '0.3';
-        }
-
-        function flipCam() {
-            frontCam = !frontCam;
-            localStream.getTracks().forEach(t => t.stop());
-            navigator.mediaDevices.getUserMedia({ video: { facingMode: frontCam ? 'user' : 'environment' }, audio: true }).then(s => {
-                localStream = s;
-                document.getElementById('local-v').srcObject = s;
-                const sender = peer.getSenders().find(s => s.track.kind === 'video');
-                sender.replaceTrack(s.getVideoTracks()[0]);
-            });
-        }
-
-        function setFilter(f) { document.getElementById('remote-v').className = "absolute inset-0 w-full h-full object-cover " + f; }
-
         function endCall() {
             if(localStream) localStream.getTracks().forEach(t => t.stop());
             if(peer) peer.close();
@@ -256,22 +211,34 @@
             document.getElementById('call-screen').classList.add('hidden');
             socket.emit('end-call', { to: active.user });
         }
+        
         socket.on('call-ended', endCall);
 
-        // SETTINGS
-        function toggleSet() { document.getElementById('settings').classList.toggle('hidden'); }
-        function setBG(input) {
-            const f = input.files[0], r = new FileReader();
-            r.onload = e => { localStorage.setItem('bg-d', e.target.result); localStorage.setItem('bg-t', f.type); loadBG(); };
-            r.readAsDataURL(f);
+        function sendMsg() {
+            const t = document.getElementById('msg-in').value;
+            if(t && active) {
+                socket.emit('send-private-msg', { to: active.user, from: me.user, text: t, fileType: 'text' });
+                document.getElementById('msg-in').value = "";
+            }
         }
-        function loadBG() {
-            const d = localStorage.getItem('bg-d'), t = localStorage.getItem('bg-t'), vid = document.getElementById('bg-video'), img = document.getElementById('bg-img');
-            if(!d) return;
-            if(t.includes('video') || t.includes('mp4')) { vid.src = d; vid.classList.remove('hidden'); img.classList.add('hidden'); }
-            else { img.style.backgroundImage = `url(${d})`; img.classList.remove('hidden'); vid.classList.add('hidden'); }
+
+        socket.on('receive-msg', d => { if(active && (d.from === active.user || d.from === me.user)) disp(d); });
+
+        function disp(d) {
+            const isMe = d.from === me.user;
+            const div = document.createElement('div');
+            div.className = `flex ${isMe ? 'justify-end' : 'justify-start'} mb-2`;
+            div.innerHTML = `<div class="p-3 px-5 rounded-[1.5rem] text-sm ${isMe ? 'bg-white text-black' : 'bg-white/10'}">${d.text}</div>`;
+            document.getElementById('msgs').appendChild(div);
+            document.getElementById('msgs').scrollTop = 9999;
         }
-        function back() { document.getElementById('sidebar').classList.remove('hidden'); document.getElementById('chat').classList.add('hidden'); }
+
+        function closeChat() { 
+            document.getElementById('chat-box').classList.add('hidden'); 
+            document.getElementById('sidebar').classList.remove('hidden'); 
+        }
+
+        function addFriend(p, n) { if(confirm(`Add ${n}?`)) socket.emit('request-contact', { targetPhone: p, fromUser: me.user }); }
     </script>
 </body>
 </html>
