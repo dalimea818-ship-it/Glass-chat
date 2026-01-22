@@ -1,244 +1,143 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="/socket.io/socket.io.js"></script>
-    <style>
-        body { color: white; height: 100vh; overflow: hidden; background: #000; font-family: sans-serif; }
-        .glass { background: rgba(255,255,255,0.03); backdrop-filter: blur(25px); border: 1px solid rgba(255,255,255,0.1); }
-        .hidden { display: none !important; }
-        #bg-video, .bg-img { position: fixed; inset: 0; z-index: -1; object-fit: cover; filter: brightness(0.3); width:100%; height:100%; }
-        
-        /* Mobile Nav */
-        @media (min-width: 768px) { .mobile-nav { display: none; } }
-        .mobile-nav { 
-            position: fixed; bottom: 0; left: 0; right: 0; height: 80px; 
-            display: flex; justify-content: space-around; align-items: center;
-            background: rgba(0,0,0,0.8); backdrop-filter: blur(20px);
-            border-top: 1px solid rgba(255,255,255,0.1); z-index: 1000;
-            padding-bottom: 20px;
-        }
-        .tab-btn { flex: 1; display: flex; flex-direction: column; align-items: center; font-size: 10px; opacity: 0.4; transition: 0.3s; }
-        .tab-btn.active { opacity: 1; color: #fff; }
-    </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="flex items-center justify-center md:p-6">
-    <video id="bg-video" autoplay muted loop class="hidden"></video>
-    <div id="bg-img" class="bg-img hidden"></div>
 
-    <div id="call-screen" class="hidden fixed inset-0 z-[2000] bg-black flex flex-col items-center justify-between py-20">
-        <video id="remote-v" autoplay playsinline class="absolute inset-0 w-full h-full object-cover"></video>
-        <video id="local-v" autoplay playsinline muted class="absolute top-10 right-6 w-24 h-36 rounded-2xl border border-white/20 object-cover"></video>
-        <div class="z-10 text-center">
-            <h1 id="call-name" class="text-3xl font-black">Virtual Call</h1>
-            <p id="call-status" class="opacity-50">Connecting...</p>
-        </div>
-        <div class="z-10 flex gap-6">
-            <button onclick="toggleTrack('audio')" class="w-14 h-14 glass rounded-full">🎤</button>
-            <button onclick="endCall()" class="w-16 h-16 bg-red-600 rounded-full text-xl">✕</button>
-            <button onclick="toggleTrack('video')" class="w-14 h-14 glass rounded-full">🎥</button>
-        </div>
-    </div>
+<body class="bg-black text-white h-screen flex">
 
-    <div class="glass w-full max-w-6xl h-full md:h-[90vh] md:rounded-[3rem] flex overflow-hidden relative">
-        
-        <div id="sidebar" class="w-full md:w-80 flex flex-col border-r border-white/5">
-            <div class="p-6 flex justify-between items-center">
-                <h1 class="font-black italic text-xl">Glass</h1>
-                <button onclick="toggleSet()" class="text-xs opacity-50">SETTINGS</button>
-            </div>
-            <div id="clist" class="flex-1 overflow-y-auto px-2 pb-24"></div>
-        </div>
+<div class="w-72 glass p-4">
+  <h1 class="font-bold mb-4">Contacts</h1>
+  <div id="users"></div>
+</div>
 
-        <div id="tab-calls" class="hidden w-full flex flex-col p-6 overflow-y-auto pb-32">
-            <h2 class="text-2xl font-black mb-6">Dialer</h2>
-            <div class="glass p-8 rounded-[2rem] text-center mb-6">
-                <input id="dial-num" placeholder="000000" class="w-full bg-transparent text-4xl font-mono mb-8 outline-none text-center">
-                <div class="grid grid-cols-3 gap-4">
-                    <button onclick="press('1')" class="h-14 glass rounded-2xl">1</button>
-                    <button onclick="press('2')" class="h-14 glass rounded-2xl">2</button>
-                    <button onclick="press('3')" class="h-14 glass rounded-2xl">3</button>
-                    <button onclick="press('4')" class="h-14 glass rounded-2xl">4</button>
-                    <button onclick="press('5')" class="h-14 glass rounded-2xl">5</button>
-                    <button onclick="press('6')" class="h-14 glass rounded-2xl">6</button>
-                    <button onclick="press('7')" class="h-14 glass rounded-2xl">7</button>
-                    <button onclick="press('8')" class="h-14 glass rounded-2xl">8</button>
-                    <button onclick="press('9')" class="h-14 glass rounded-2xl">9</button>
-                    <button onclick="document.getElementById('dial-num').value=''" class="h-14 text-red-500">C</button>
-                    <button onclick="press('0')" class="h-14 glass rounded-2xl">0</button>
-                    <button onclick="makeVirtualCall()" class="h-14 bg-green-600 rounded-2xl">📞</button>
-                </div>
-            </div>
-            <div id="call-history" class="space-y-2"></div>
-        </div>
+<div class="flex-1 flex flex-col">
+  <div class="p-4 border-b flex justify-between">
+    <span id="chatWith">Select a contact</span>
+    <button onclick="startCall()" class="border px-4 rounded">Call</button>
+  </div>
 
-        <div id="chat-box" class="hidden md:flex flex-1 flex-col bg-white/[0.01]">
-            <div class="p-4 border-b border-white/5 flex items-center justify-between">
-                <button onclick="closeChat()" class="md:hidden">←</button>
-                <div class="flex items-center gap-3">
-                    <img id="apfp" class="w-10 h-10 rounded-full border border-white/10">
-                    <span id="aname" class="font-bold">Chat</span>
-                </div>
-                <button onclick="startCall()" class="px-4 py-2 glass rounded-full text-[10px] font-bold">🎥 CALL</button>
-            </div>
-            <div id="msgs" class="flex-1 overflow-y-auto p-6 space-y-4"></div>
-            <div class="p-4 flex gap-2">
-                <input id="msg-in" placeholder="Message..." class="flex-1 bg-white/5 p-4 rounded-3xl outline-none" onkeypress="if(event.key==='Enter')sendMsg()">
-                <button onclick="sendMsg()" class="bg-white text-black w-12 h-12 rounded-full font-bold">➜</button>
-            </div>
-        </div>
-    </div>
+  <div id="messages" class="flex-1 p-4 overflow-y-auto"></div>
 
-    <div class="mobile-nav">
-        <div onclick="setTab('chats')" class="tab-btn active" id="btn-chats"><span>💬</span>Chats</div>
-        <div onclick="setTab('global')" class="tab-btn" id="btn-global"><span>🌍</span>Global</div>
-        <div onclick="setTab('calls')" class="tab-btn" id="btn-calls"><span>📞</span>Calls</div>
-    </div>
+  <div class="p-4 flex gap-2">
+    <input id="msg" class="flex-1 bg-gray-800 p-2 rounded">
+    <button onclick="sendMsg()" class="bg-white text-black px-4 rounded">Send</button>
+  </div>
+</div>
 
-    <script>
-        const socket = io();
-        const me = JSON.parse(localStorage.getItem('user'));
-        let active = null, currentMode = 'contacts', peer, localStream;
+<!-- CALL OVERLAY -->
+<div id="callUI" class="hidden fixed inset-0 bg-black flex flex-col items-center justify-center">
+  <video id="remote" autoplay class="w-full h-full object-cover"></video>
+  <video id="local" autoplay muted class="w-40 absolute bottom-4 right-4"></video>
 
-        if(!me) window.location.href = "/";
-        socket.emit('login', me);
+  <div class="absolute bottom-10 flex gap-6">
+    <button onclick="toggleMute()">🎤</button>
+    <button onclick="endCall()">❌</button>
+    <button onclick="toggleCam()">📷</button>
+  </div>
+</div>
 
-        function setTab(tab) {
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            document.getElementById('btn-'+tab).classList.add('active');
-            
-            document.getElementById('sidebar').classList.add('hidden');
-            document.getElementById('tab-calls').classList.add('hidden');
-            document.getElementById('chat-box').classList.add('hidden');
+<script>
+const socket = io();
+const me = JSON.parse(localStorage.getItem("user")) || { user: prompt("Username") };
+let activeUser = null;
+let peer, localStream;
 
-            if(tab === 'chats') {
-                currentMode = 'contacts';
-                document.getElementById('sidebar').classList.remove('hidden');
-                updateList();
-            } else if(tab === 'global') {
-                currentMode = 'global';
-                document.getElementById('sidebar').classList.remove('hidden');
-                updateList();
-            } else {
-                document.getElementById('tab-calls').classList.remove('hidden');
-                socket.emit('get-calls', me.user);
-            }
-        }
+socket.emit("login", me);
 
-        function updateList() {
-            document.getElementById('clist').innerHTML = "";
-            if(currentMode === 'global') socket.emit('get-online-users');
-            else socket.emit('login', me);
-        }
+socket.on("online-users", users => {
+  const u = document.getElementById("users");
+  u.innerHTML = "";
+  users.filter(x => x !== me.user).forEach(user => {
+    const d = document.createElement("div");
+    d.textContent = user;
+    d.onclick = () => openChat(user);
+    u.appendChild(d);
+  });
+});
 
-        socket.on('online-list', list => render(list, 'GLOBAL'));
-        socket.on('load-my-contacts', list => render(list, 'CONTACTS'));
+function openChat(user) {
+  activeUser = user;
+  document.getElementById("chatWith").innerText = user;
+  socket.emit("join-room", { me: me.user, other: user });
+}
 
-        function render(list, label) {
-            const container = document.getElementById('clist');
-            container.innerHTML += `<p class="text-[9px] opacity-30 mt-4 mb-2 ml-4">${label}</p>`;
-            list.forEach(u => {
-                const d = document.createElement('div');
-                d.className = "p-4 glass rounded-2xl flex justify-between items-center mb-2 mx-2 cursor-pointer";
-                d.innerHTML = `
-                    <div class="flex items-center gap-3" onclick="openChat(${JSON.stringify(u)})">
-                        <img src="${u.pfp || 'data:image/gif;base64,R0lGODlhAQABAIAAAAUEBAAAACwAAAAAAQABAAACAkQBADs='}" class="w-10 h-10 rounded-full">
-                        <p class="font-bold text-sm">${u.user}</p>
-                    </div>
-                    ${currentMode==='global' ? `<button onclick="addFriend('${u.phone}','${u.user}')" class="text-pink-500">♥</button>` : ''}
-                `;
-                container.appendChild(d);
-            });
-        }
+function sendMsg() {
+  const text = msg.value;
+  socket.emit("send-msg", { from: me.user, to: activeUser, text });
+  msg.value = "";
+}
 
-        function openChat(u) {
-            active = u;
-            document.getElementById('aname').innerText = u.user;
-            document.getElementById('apfp').src = u.pfp || '';
-            document.getElementById('chat-box').classList.remove('hidden');
-            document.getElementById('chat-box').classList.add('flex');
-            document.getElementById('sidebar').classList.add('hidden');
-            document.getElementById('msgs').innerHTML = "";
-            socket.emit('load-history', { from: me.user, to: u.user });
-        }
+socket.on("receive-msg", d => {
+  const m = document.createElement("div");
+  m.textContent = `${d.from}: ${d.text}`;
+  messages.appendChild(m);
+});
 
-        function press(n) { document.getElementById('dial-num').value += n; }
+/* ---------- WEBRTC ---------- */
 
-        async function makeVirtualCall() {
-            const num = document.getElementById('dial-num').value;
-            if(!num) return;
-            active = { user: num, phone: num };
-            startCall();
-        }
+async function startCall() {
+  localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+  peer = new RTCPeerConnection();
 
-        async function startCall() {
-            document.getElementById('call-screen').classList.remove('hidden');
-            document.getElementById('call-name').innerText = active.user;
-            await initRTC(true);
-            socket.emit('start-call', { to: active.user, from: me.user, pfp: me.pfp });
-        }
+  localStream.getTracks().forEach(t => peer.addTrack(t, localStream));
+  local.srcObject = localStream;
 
-        async function initRTC(isCaller) {
-            peer = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
-            localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-            document.getElementById('local-v').srcObject = localStream;
-            localStream.getTracks().forEach(t => peer.addTrack(t, localStream));
-            peer.ontrack = e => document.getElementById('remote-v').srcObject = e.streams[0];
-            peer.onicecandidate = e => { if(e.candidate) socket.emit('rtc-signal', { to: active.user, signal: e.candidate }); };
-            if(isCaller) {
-                const offer = await peer.createOffer();
-                await peer.setLocalDescription(offer);
-                socket.emit('rtc-signal', { to: active.user, signal: offer });
-            }
-        }
+  peer.ontrack = e => remote.srcObject = e.streams[0];
+  peer.onicecandidate = e => {
+    if (e.candidate) socket.emit("ice-candidate", { to: activeUser, candidate: e.candidate });
+  };
 
-        socket.on('rtc-signal', async d => {
-            if(!peer) await initRTC(false);
-            if(d.signal.type === 'offer') {
-                await peer.setRemoteDescription(new RTCSessionDescription(d.signal));
-                const ans = await peer.createAnswer();
-                await peer.setLocalDescription(ans);
-                socket.emit('rtc-signal', { to: d.from, signal: ans });
-            } else if(d.signal.type === 'answer') await peer.setRemoteDescription(new RTCSessionDescription(d.signal));
-            else if(d.signal.candidate) await peer.addIceCandidate(new RTCIceCandidate(d.signal));
-        });
+  const offer = await peer.createOffer();
+  await peer.setLocalDescription(offer);
+  socket.emit("call-user", { to: activeUser, from: me.user, signal: offer });
 
-        function endCall() {
-            if(localStream) localStream.getTracks().forEach(t => t.stop());
-            if(peer) peer.close();
-            peer = null;
-            document.getElementById('call-screen').classList.add('hidden');
-            socket.emit('end-call', { to: active.user });
-        }
-        
-        socket.on('call-ended', endCall);
+  callUI.classList.remove("hidden");
+}
 
-        function sendMsg() {
-            const t = document.getElementById('msg-in').value;
-            if(t && active) {
-                socket.emit('send-private-msg', { to: active.user, from: me.user, text: t, fileType: 'text' });
-                document.getElementById('msg-in').value = "";
-            }
-        }
+socket.on("incoming-call", async ({ from, signal }) => {
+  activeUser = from;
+  localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+  peer = new RTCPeerConnection();
 
-        socket.on('receive-msg', d => { if(active && (d.from === active.user || d.from === me.user)) disp(d); });
+  localStream.getTracks().forEach(t => peer.addTrack(t, localStream));
+  local.srcObject = localStream;
 
-        function disp(d) {
-            const isMe = d.from === me.user;
-            const div = document.createElement('div');
-            div.className = `flex ${isMe ? 'justify-end' : 'justify-start'} mb-2`;
-            div.innerHTML = `<div class="p-3 px-5 rounded-[1.5rem] text-sm ${isMe ? 'bg-white text-black' : 'bg-white/10'}">${d.text}</div>`;
-            document.getElementById('msgs').appendChild(div);
-            document.getElementById('msgs').scrollTop = 9999;
-        }
+  peer.ontrack = e => remote.srcObject = e.streams[0];
+  peer.onicecandidate = e => {
+    if (e.candidate) socket.emit("ice-candidate", { to: from, candidate: e.candidate });
+  };
 
-        function closeChat() { 
-            document.getElementById('chat-box').classList.add('hidden'); 
-            document.getElementById('sidebar').classList.remove('hidden'); 
-        }
+  await peer.setRemoteDescription(signal);
+  const answer = await peer.createAnswer();
+  await peer.setLocalDescription(answer);
 
-        function addFriend(p, n) { if(confirm(`Add ${n}?`)) socket.emit('request-contact', { targetPhone: p, fromUser: me.user }); }
-    </script>
+  socket.emit("answer-call", { to: from, signal: answer });
+  callUI.classList.remove("hidden");
+});
+
+socket.on("call-answered", async signal => {
+  await peer.setRemoteDescription(signal);
+});
+
+socket.on("ice-candidate", c => peer.addIceCandidate(c));
+
+function endCall() {
+  peer.close();
+  localStream.getTracks().forEach(t => t.stop());
+  callUI.classList.add("hidden");
+}
+
+function toggleMute() {
+  localStream.getAudioTracks()[0].enabled ^= true;
+}
+
+function toggleCam() {
+  localStream.getVideoTracks()[0].enabled ^= true;
+}
+</script>
+
 </body>
 </html>
